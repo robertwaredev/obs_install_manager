@@ -1,12 +1,19 @@
-use crate::{install, ui};
+use crate::ui::{self, InstallItem, Item, ItemKind, ListItemExecution};
 pub use color_eyre::Result;
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::prelude::*;
 use ratatui::{DefaultTerminal, widgets::*};
 use std::{sync::mpsc, thread};
 
+pub enum Screen {
+    Main,
+    Releases,
+}
+
 pub enum Event {
     Key(KeyEvent),
+    List(Vec<Item>),
+    Screen(Screen),
     Progress(f64),
 }
 
@@ -22,60 +29,45 @@ pub fn send_progress_event(ratio: f64, tx: mpsc::Sender<Event>) {
     tx.send(Event::Progress(ratio)).unwrap()
 }
 
-#[derive(Clone)]
-pub enum Item {
-    Obs(&'static str),
-    Vmb(&'static str),
-    Ja2(&'static str),
-    Khs(&'static str),
-}
-
-impl Item {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Item::Obs(s) => s,
-            Item::Vmb(s) => s,
-            Item::Ja2(s) => s,
-            Item::Khs(s) => s,
-        }
-    }
-}
-
 pub struct App {
-    pub exit: bool,
-    pub event_tx: mpsc::Sender<Event>,
-    pub event_rx: mpsc::Receiver<Event>,
+    pub evtx: mpsc::Sender<Event>,
+    pub evrx: mpsc::Receiver<Event>,
     pub list: ui::StatefulList<'static>,
-    pub progress: ui::ProgressBar,
-}
-
-impl Default for App {
-    fn default() -> Self {
-        let (event_tx, event_rx) = mpsc::channel::<Event>();
-        Self {
-            exit: false,
-            event_tx,
-            event_rx,
-            list: Default::default(),
-            progress: Default::default(),
-        }
-    }
+    pub pbar: ui::ProgressBar,
+    pub exit: bool,
 }
 
 impl App {
     pub fn new() -> Self {
-        let (event_tx, event_rx) = mpsc::channel::<Event>();
+        let (evtx, evrx) = mpsc::channel::<Event>();
 
         let items = vec![
-            Item::Obs("Install OBS (Open Broadcast Software)"),
+            Item::new(
+                ItemKind::Install(InstallItem::Obs),
+                "Install OBS (Open Broadcast Software)".to_string(),
+            ),
             #[cfg(target_os = "windows")]
-            Item::Vmb("Install Voicemeeter Banana"),
+            Item::new(
+                ItemKind::Install(InstallItem::Vmb),
+                "Install Voicemeeter Banana".to_string(),
+            ),
             #[cfg(target_os = "linux")]
-            Item::Ja2("Install Jack Audio Connection Kit"),
-            Item::Khs("Install Kilohearts Bundle"),
+            Item::new(
+                ItemKind::Install(InstallItem::Ja2),
+                "Install Jack Audio Connection Kit".to_string(),
+            ),
+            Item::new(
+                ItemKind::Install(InstallItem::Khs),
+                "Install Kilohearts Bundle".to_string(),
+            ),
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
+            Item::new(
+                ItemKind::Install(InstallItem::Sbs),
+                "Install Sonobus".to_string(),
+            ),
         ];
         let state = ListState::default().with_selected(Some(0));
-        let header = Line::from(" OBS Install Manager ").centered();
+        let header = Line::from(" OBS Install Manager ");
         let footer = Line::from(vec![
             " Up ".green().into(),
             "<↑>".green().bold(),
@@ -88,8 +80,7 @@ impl App {
             " -".bold(),
             " Exit ".red().into(),
             "<Esc> ".red().bold(),
-        ])
-        .centered();
+        ]);
 
         let list = ui::StatefulList {
             items,
@@ -98,31 +89,33 @@ impl App {
             footer,
         };
 
-        let progress = ui::ProgressBar {
+        let pbar = ui::ProgressBar {
             title: " Downloading ",
             ..Default::default()
         };
 
         Self {
-            exit: false,
-            event_tx,
-            event_rx,
+            evtx,
+            evrx,
             list,
-            progress,
+            pbar,
+            exit: false,
         }
     }
 
     pub fn run(&mut self, mut term: DefaultTerminal) -> Result<()> {
-        let key_tx = self.event_tx.clone();
+        let key_tx = self.evtx.clone();
         thread::spawn(move || {
             send_key_event(key_tx);
         });
 
         while !self.exit {
-            match self.event_rx.recv()? {
+            match self.evrx.recv()? {
                 Event::Key(key_event) => self.handle_key_event(key_event),
-                Event::Progress(ratio) => self.progress.set_ratio(ratio),
-            }
+                Event::Progress(ratio) => self.pbar.set_ratio(ratio),
+                Event::List(_items) => (),
+                Event::Screen(_screen) => (),
+            };
 
             term.draw(|frame| self.draw(frame))?;
         }
@@ -148,14 +141,12 @@ impl App {
 
     fn select_accept(&mut self) {
         if let Some(selected) = self.list.state.selected() {
-            let tx = self.event_tx.clone();
+            let tx = self.evtx.clone();
             let item = self.list.items[selected].clone();
 
-            thread::spawn(move || match item {
-                Item::Obs(_) => install::install_obs(tx),
-                Item::Vmb(_) => install::install_vmb(tx),
-                Item::Ja2(_) => install::install_ja2(tx),
-                Item::Khs(_) => install::install_khs(tx),
+            thread::spawn(move || match item.kind {
+                ItemKind::Install(install_item) => install_item.execute(tx),
+                ItemKind::Release => Ok(()),
             });
         }
     }
@@ -179,14 +170,10 @@ impl Widget for &mut App {
             .flex(layout::Flex::Center);
         let [top, btm] = layout.areas(cell);
 
-        match self.progress.ratio {
-            0.0 => {
-                self.list.render(top, buf);
-            }
-            _ => {
-                self.list.render(top, buf);
-                self.progress.render(btm, buf);
-            }
+        self.list.render(top, buf);
+
+        if self.pbar.ratio != 0.0 {
+            self.pbar.render(btm, buf);
         }
     }
 }

@@ -15,11 +15,13 @@ pub const OBS_GIT_REPO: GithubRepo = GithubRepo {
     name: "obs-studio",
 };
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub const JACK2_GIT_REPO: GithubRepo = GithubRepo {
     author: "jackaudio",
     name: "jack2-releases",
 };
 
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 pub const SONOBUS_GIT_REPO: GithubRepo = GithubRepo {
     author: "sonosaurus",
     name: "sonobus",

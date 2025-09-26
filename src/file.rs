@@ -76,15 +76,15 @@ pub fn remove_extension(file_name: &String) -> &str {
         .expect("Could not remove extension!")
 }
 
-pub fn run_command(path: &Path) -> io::Result<i32> {
-    if !path.exists() {
+pub fn run_command<P: AsRef<Path>>(path: P) -> io::Result<i32> {
+    if !path.as_ref().exists() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
-            format!("Path not valid: {}", path.to_str().unwrap()),
+            format!("Path not valid: {:?}", path.as_ref()),
         ));
     }
 
-    let mut cmd = Command::new(path);
+    let mut cmd = Command::new(path.as_ref().as_os_str());
     let status = cmd
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())

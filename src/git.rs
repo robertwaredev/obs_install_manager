@@ -14,7 +14,7 @@ pub struct GithubApiClient(Client);
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct GithubReleases {
-    releases: Vec<GithubRelease>,
+    pub releases: Vec<GithubRelease>,
 }
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
@@ -89,27 +89,27 @@ impl GithubApiClient {
         )
     }
 
-    // pub fn get_releases(&self, repo: GithubRepo) -> Result<GithubReleases> {
-    //     let mut url = PathBuf::new();
-    //     url.push(GIT_REPO_API);
-    //     url.push(repo.author);
-    //     url.push(repo.name);
-    //     url.push("releases");
-    //     let url = url.to_str().expect("GitRepo struct is not valid UTF-8.");
+    pub fn get_releases(&self, repo: GithubRepo) -> Result<GithubReleases> {
+        let mut url = PathBuf::new();
+        url.push(GIT_REPO_API);
+        url.push(repo.author);
+        url.push(repo.name);
+        url.push("releases");
+        let url = url.to_str().expect("GitRepo struct is not valid UTF-8.");
 
-    //     let response = self.0.get(url).send()?;
-    //     match response.status() {
-    //         reqwest::StatusCode::OK => response
-    //             .json::<GithubReleases>()
-    //             .map_err(|e| eyre!("JSON decode error: {}", e)),
-    //         reqwest::StatusCode::NOT_FOUND => Err(eyre!("(404) Repository not found.")),
-    //         reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),
-    //         status => {
-    //             let error_body = response.text()?;
-    //             Err(eyre!("HTTP {}: {}", status, error_body))
-    //         }
-    //     }
-    // }
+        let response = self.0.get(url).send()?;
+        match response.status() {
+            reqwest::StatusCode::OK => response
+                .json::<GithubReleases>()
+                .map_err(|e| eyre!("JSON decode error: {}", e)),
+            reqwest::StatusCode::NOT_FOUND => Err(eyre!("(404) Repository not found.")),
+            reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),
+            status => {
+                let error_body = response.text()?;
+                Err(eyre!("HTTP {}: {}", status, error_body))
+            }
+        }
+    }
 
     pub fn get_latest(&self, repo: GithubRepo) -> Result<GithubRelease> {
         let mut url = PathBuf::new();

@@ -1,8 +1,33 @@
-use crate::{app::Event, file, git::*, scut};
+use crate::{
+    app::Event,
+    file,
+    git::*,
+    scut,
+    ui::{self, Item},
+};
 use color_eyre::{Result, eyre::eyre};
 use std::{fs, os, sync::mpsc};
 
-pub fn install_obs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
+pub fn get_obs_releases(list_tx: mpsc::Sender<Event>) -> Result<()> {
+    let git_releases = GithubApiClient::new()
+        .get_releases(crate::OBS_GIT_REPO)
+        .expect("Could not get OBS git releases!");
+
+    list_tx.send(Event::List(
+        git_releases
+            .releases
+            .into_iter()
+            .map(|r| Item {
+                kind: ui::ItemKind::Release,
+                desc: r.name,
+            })
+            .collect::<Vec<ui::Item>>(),
+    ))?;
+
+    Ok(())
+}
+
+pub fn obs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
     // Build search tags per operating system
     #[cfg(target_os = "windows")]
     let (inc, exc) = (vec!["windows", "zip"], vec!["pdb"]);
@@ -109,7 +134,7 @@ pub fn install_obs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
     Ok(())
 }
 
-pub fn install_ja2(progress_tx: mpsc::Sender<Event>) -> Result<()> {
+pub fn ja2(progress_tx: mpsc::Sender<Event>) -> Result<()> {
     // Build search tags per operating system
     #[cfg(target_os = "windows")]
     let inc = vec!["win"];
@@ -160,21 +185,21 @@ pub fn install_ja2(progress_tx: mpsc::Sender<Event>) -> Result<()> {
     )?;
 
     // Install & clean up
-    file::run_command(file_path.as_path())?;
-    fs::remove_file(file_path)?;
+    file::run_command(&file_path)?;
+    fs::remove_file(&file_path)?;
 
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
-pub fn install_vmb(_progress_tx: mpsc::Sender<Event>) -> Result<()> {
+pub fn vmb(_progress_tx: mpsc::Sender<Event>) -> Result<()> {
     Ok(file::winget(&[
         "install --id=VB-Audio.Voicemeeter.Banana  -e",
     ])?)
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-pub fn install_khs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
+pub fn khs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
     let exe_path = std::env::current_exe()?;
     let exe_dir = exe_path.parent().unwrap();
 
@@ -185,8 +210,55 @@ pub fn install_khs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
 
     // Install & clean up
     file::download_file(crate::KHS_URL, &file_path, progress_tx)?;
-    file::run_command(file_path.as_path())?;
-    fs::remove_file(file_path)?;
+    file::run_command(&file_path)?;
+    fs::remove_file(&file_path)?;
+
+    Ok(())
+}
+
+pub fn sbs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
+    // Build search tags per operating system
+    #[cfg(target_os = "windows")]
+    let inc = vec!["win", "exe"];
+    #[cfg(target_os = "macos")]
+    let inc = vec!["mac", "dmg"];
+
+    // TODO: Prompt user for version instead of defaulting to latest.
+    // Get latest OBS release assets
+    let git_release = GithubApiClient::new()
+        .get_latest(crate::SONOBUS_GIT_REPO)
+        .expect("Could not get latest OBS git release!");
+
+    // Filter OBS assets using search tags
+    let git_assets = git_release
+        .assets
+        .iter()
+        .cloned()
+        .filter(|asset| {
+            let name = asset.name.to_lowercase();
+            inc.iter().all(|i| name.contains(i))
+        })
+        .collect::<Vec<GithubAsset>>();
+
+    // TODO: Prompt user in event of multiple files
+    assert_eq!(git_assets.len(), 1);
+    let git_asset = git_assets[0].clone();
+
+    // Build paths
+    let exe_path = std::env::current_exe()?;
+    let exe_dir = exe_path.parent().unwrap();
+    let file_path = exe_dir.join(&git_asset.name);
+
+    // Download asset
+    file::download_file(
+        git_asset.browser_download_url.as_str(),
+        &file_path,
+        progress_tx.clone(),
+    )?;
+
+    // Install & clean up
+    file::run_command(&file_path)?;
+    fs::remove_file(&file_path)?;
 
     Ok(())
 }
