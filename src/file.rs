@@ -76,7 +76,7 @@ pub fn remove_extension(file_name: &String) -> &str {
         .expect("Could not remove extension!")
 }
 
-pub fn run_command<P: AsRef<Path>>(path: P) -> io::Result<i32> {
+pub fn run<P: AsRef<Path>>(path: P) -> io::Result<i32> {
     if !path.as_ref().exists() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,

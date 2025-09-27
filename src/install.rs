@@ -1,264 +1,296 @@
-use crate::{
-    app::Event,
-    file,
-    git::*,
-    scut,
-    ui::{self, Item},
-};
+use crate::{app::Event, file, git::*, scut};
 use color_eyre::{Result, eyre::eyre};
 use std::{fs, os, sync::mpsc};
 
-pub fn get_obs_releases(list_tx: mpsc::Sender<Event>) -> Result<()> {
-    let git_releases = GithubApiClient::new()
-        .get_releases(crate::OBS_GIT_REPO)
-        .expect("Could not get OBS git releases!");
+pub trait Installable {
+    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()>;
+}
 
-    list_tx.send(Event::List(
-        git_releases
-            .releases
-            .into_iter()
-            .map(|r| Item {
-                kind: ui::ItemKind::Release,
-                desc: r.name,
+#[derive(Clone)]
+pub enum Installer {
+    Obs(Obs),
+    Vmb(Vmb),
+    Ja2(Ja2),
+    Khs(Khs),
+    Sbs(Sbs),
+}
+
+#[derive(Default, Clone)]
+pub struct Obs {
+    pub version: Option<String>,
+}
+
+impl Installable for Obs {
+    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+        // Build search tags per operating system
+        #[cfg(target_os = "windows")]
+        let (inc, exc) = (vec!["windows", "zip"], vec!["pdb"]);
+        #[cfg(target_os = "macos")]
+        let (inc, exc) = (vec!["macos", "dmg"], vec![]);
+        #[cfg(target_os = "linux")]
+        let (inc, exc) = (vec!["ubuntu", "deb"], vec!["ddeb"]);
+
+        // Build search tags per cpu architecture
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        let arch = vec!["intel", "x86", "x64"];
+        #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+        let arch = vec!["arm", "apple"];
+
+        // TODO: Prompt user for version instead of defaulting to latest.
+        // Get latest OBS release assets
+        let git_release = match &self.version {
+            Some(version) => GithubApiClient::new()
+                .get_latest(crate::OBS_GIT_REPO)
+                .expect("Could not get git release!"),
+            None => GithubApiClient::new()
+                .get_latest(crate::OBS_GIT_REPO)
+                .expect("Could not get latest git release!"),
+        };
+
+        // Filter OBS assets using search tags
+        let git_assets = git_release
+            .assets
+            .iter()
+            .cloned()
+            .filter(|asset| {
+                let name = asset.name.to_lowercase();
+                inc.iter().all(|i| name.contains(i))
+                    && !exc.iter().any(|e| name.contains(e))
+                    && arch.iter().any(|a| name.contains(a))
             })
-            .collect::<Vec<ui::Item>>(),
-    ))?;
+            .collect::<Vec<GithubAsset>>();
 
-    Ok(())
-}
+        // TODO: Prompt user in event of multiple files
+        assert_eq!(git_assets.len(), 1);
+        let git_asset = git_assets[0].clone();
 
-pub fn obs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
-    // Build search tags per operating system
-    #[cfg(target_os = "windows")]
-    let (inc, exc) = (vec!["windows", "zip"], vec!["pdb"]);
-    #[cfg(target_os = "macos")]
-    let (inc, exc) = (vec!["macos", "dmg"], vec![]);
-    #[cfg(target_os = "linux")]
-    let (inc, exc) = (vec!["ubuntu", "deb"], vec!["ddeb"]);
+        // Build paths
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+        let file_path = exe_dir.join(&git_asset.name);
+        let file_name = file::remove_extension(&git_asset.name);
+        let obs_dir = exe_dir.join(file_name);
 
-    // Build search tags per cpu architecture
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    let arch = vec!["intel", "x86", "x64"];
-    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-    let arch = vec!["arm", "apple"];
+        if obs_dir.exists() || file_path.exists() {
+            opener::open(exe_dir)?;
+            return Err(eyre!("OBS is already installed!"));
+        }
 
-    // TODO: Prompt user for version instead of defaulting to latest.
-    // Get latest OBS release assets
-    let git_release = GithubApiClient::new()
-        .get_latest(crate::OBS_GIT_REPO)
-        .expect("Could not get latest OBS git release!");
+        // Download asset
+        file::download_file(git_asset.browser_download_url.as_str(), &file_path, tx)?;
 
-    // Filter OBS assets using search tags
-    let git_assets = git_release
-        .assets
-        .iter()
-        .cloned()
-        .filter(|asset| {
-            let name = asset.name.to_lowercase();
-            inc.iter().all(|i| name.contains(i))
-                && !exc.iter().any(|e| name.contains(e))
-                && arch.iter().any(|a| name.contains(a))
-        })
-        .collect::<Vec<GithubAsset>>();
+        #[cfg(target_os = "windows")]
+        {
+            // Extract ZIP
+            file::extract_zip(&file_path, &obs_dir)?;
+            fs::remove_file(file_path)?;
 
-    // TODO: Prompt user in event of multiple files
-    assert_eq!(git_assets.len(), 1);
-    let git_asset = git_assets[0].clone();
+            // Enable portable mode
+            fs::File::create(obs_dir.join("portable_mode"))?;
 
-    // Build paths
-    let exe_path = std::env::current_exe()?;
-    let exe_dir = exe_path.parent().unwrap();
-    let file_path = exe_dir.join(&git_asset.name);
-    let file_name = file::remove_extension(&git_asset.name);
-    let obs_dir = exe_dir.join(file_name);
+            // Create config true folder
+            let true_config = exe_dir.join("obs-config");
+            if !true_config.exists() {
+                fs::create_dir(&true_config)?;
+            }
 
-    if obs_dir.exists() || file_path.exists() {
+            // Symlink config link folder
+            let link_config = obs_dir.join("config");
+            os::windows::fs::symlink_dir(true_config, link_config)?;
+
+            // Create shortcut
+            let scut_path = exe_dir.join("OBS.lnk");
+            let target_path = obs_dir.join("bin/64bit/obs64.exe");
+            scut::create_shortcut(scut_path, target_path)?;
+        }
+
+        #[cfg(target_family = "unix")]
+        {
+            // TODO: Run and rename installation according to version number
+
+            // Create config true folder
+            let true_config = exe_dir.join("obs-config");
+            if !true_config.exists() {
+                fs::create_dir(&true_config)?;
+            }
+
+            // Symlink config folder
+            let link_config = obs_dir.join("config");
+            os::unix::fs::symlink(true_config, link_config)?;
+
+            // TODO: Create shortcut
+        }
+
+        // Open directory
         opener::open(exe_dir)?;
-        return Err(eyre!("OBS is already installed!"));
+
+        // TODO: Download pre-built OBS config
+
+        Ok(())
     }
+}
 
-    // Download asset
-    file::download_file(
-        git_asset.browser_download_url.as_str(),
-        &file_path,
-        progress_tx.clone(),
-    )?;
+#[derive(Default, Clone)]
+pub struct Ja2 {
+    pub version: Option<String>,
+}
 
-    #[cfg(target_os = "windows")]
-    {
-        // Extract ZIP
-        file::extract_zip(&file_path, &obs_dir)?;
-        fs::remove_file(file_path)?;
+impl Installable for Ja2 {
+    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+        // Build search tags per operating system
+        #[cfg(target_os = "windows")]
+        let inc = vec!["win"];
+        #[cfg(target_os = "macos")]
+        let inc = vec!["macos"];
+        #[cfg(target_os = "linux")]
+        let inc = vec!["ubuntu"];
 
-        // Enable portable mode
-        fs::File::create(obs_dir.join("portable_mode"))?;
+        // Build search tags per cpu architecture
+        #[cfg(any(target_arch = "x86"))]
+        let arch = vec!["intel", "32"];
+        #[cfg(any(target_arch = "x86_64"))]
+        let arch = vec!["intel", "64"];
+        #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+        let arch = vec!["universal"];
 
-        // Create config true folder
-        let true_config = exe_dir.join("obs-config");
-        if !true_config.exists() {
-            fs::create_dir(&true_config)?;
+        // Get latest OBS release assets
+        let git_release = match &self.version {
+            Some(version) => GithubApiClient::new()
+                .get_latest(crate::JACK2_GIT_REPO)
+                .expect("Could not get git release!"),
+            None => GithubApiClient::new()
+                .get_latest(crate::JACK2_GIT_REPO)
+                .expect("Could not get latest git release!"),
+        };
+
+        // Filter assets using search tags
+        let git_assets = git_release
+            .assets
+            .iter()
+            .cloned()
+            .filter(|asset| {
+                let name = asset.name.to_lowercase();
+                inc.iter().all(|i| name.contains(i)) && arch.iter().any(|a| name.contains(a))
+            })
+            .collect::<Vec<GithubAsset>>();
+
+        let git_asset = git_assets[0].clone();
+
+        // Build paths
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+        let file_path = exe_dir.join(&git_asset.name);
+
+        // Download asset
+        file::download_file(git_asset.browser_download_url.as_str(), &file_path, tx)?;
+
+        // Install & clean up
+        file::run(&file_path)?;
+        fs::remove_file(&file_path)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Sbs {
+    pub version: Option<String>,
+}
+
+impl Installable for Sbs {
+    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+        // Build search tags per operating system
+        #[cfg(target_os = "windows")]
+        let inc = vec!["win", "exe"];
+        #[cfg(target_os = "macos")]
+        let inc = vec!["mac", "dmg"];
+
+        // TODO: Prompt user for version instead of defaulting to latest.
+        // Get latest OBS release assets
+        let git_release = match &self.version {
+            Some(version) => GithubApiClient::new()
+                .get_latest(crate::SONOBUS_GIT_REPO)
+                .expect("Could not get git release!"),
+            None => GithubApiClient::new()
+                .get_latest(crate::SONOBUS_GIT_REPO)
+                .expect("Could not get latest git release!"),
+        };
+
+        // Filter OBS assets using search tags
+        let git_assets = git_release
+            .assets
+            .iter()
+            .cloned()
+            .filter(|asset| {
+                let name = asset.name.to_lowercase();
+                inc.iter().all(|i| name.contains(i))
+            })
+            .collect::<Vec<GithubAsset>>();
+
+        let git_asset = git_assets[0].clone();
+
+        // Build paths
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+        let file_path = exe_dir.join(&git_asset.name);
+
+        // Download asset
+        file::download_file(git_asset.browser_download_url.as_str(), &file_path, tx)?;
+
+        // Install & clean up
+        file::run(&file_path)?;
+        fs::remove_file(&file_path)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Vmb;
+
+impl Installable for Vmb {
+    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+
+        let zip_path = exe_dir.join("voicemeeter_banana_installer.zip");
+        let exe_path = exe_dir.join("voicemeeterprosetup.exe");
+
+        // Install & clean up
+        if !zip_path.exists() && !exe_path.exists() {
+            file::download_file(crate::VMB_URL, &zip_path, tx)?;
+            file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
+            fs::remove_file(&zip_path)?;
         }
 
-        // Symlink config link folder
-        let link_config = obs_dir.join("config");
-        os::windows::fs::symlink_dir(true_config, link_config)?;
+        // Open directory
+        file::run(&exe_path)?;
+        fs::remove_file(&exe_path)?;
 
-        // Create shortcut
-        let scut_path = exe_dir.join("OBS.lnk");
-        let target_path = obs_dir.join("bin/64bit/obs64.exe");
-        scut::create_shortcut(scut_path, target_path)?;
+        Ok(())
     }
+}
 
-    #[cfg(target_family = "unix")]
-    {
-        // TODO: Run and rename installation according to version number
+#[derive(Default, Clone)]
+pub struct Khs;
 
-        // Create config true folder
-        let true_config = exe_dir.join("obs-config");
-        if !true_config.exists() {
-            fs::create_dir(&true_config)?;
+impl Installable for Khs {
+    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+
+        #[cfg(target_os = "windows")]
+        let file_path = exe_dir.join("kilohearts_installer.exe");
+        #[cfg(target_os = "macos")]
+        let file_path = exe_dir.join("kilohearts_installer.dmg");
+
+        // Install & clean up
+        if !file_path.exists() {
+            file::download_file(crate::KHS_URL, &file_path, tx)?;
         }
+        file::run(&file_path)?;
+        fs::remove_file(&file_path)?;
 
-        // Symlink config folder
-        let link_config = obs_dir.join("config");
-        os::unix::fs::symlink(true_config, link_config)?;
-
-        // TODO: Create shortcut
+        Ok(())
     }
-
-    // Open directory
-    opener::open(exe_dir)?;
-
-    // TODO: Download pre-built OBS config
-
-    Ok(())
-}
-
-pub fn ja2(progress_tx: mpsc::Sender<Event>) -> Result<()> {
-    // Build search tags per operating system
-    #[cfg(target_os = "windows")]
-    let inc = vec!["win"];
-    #[cfg(target_os = "macos")]
-    let inc = vec!["macos"];
-    #[cfg(target_os = "linux")]
-    let inc = vec!["ubuntu"];
-
-    // Build search tags per cpu architecture
-    #[cfg(any(target_arch = "x86"))]
-    let arch = vec!["intel", "32"];
-    #[cfg(any(target_arch = "x86_64"))]
-    let arch = vec!["intel", "64"];
-    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-    let arch = vec!["universal"];
-
-    // TODO: Prompt user for version instead of defaulting to latest.
-    // Get latest OBS release assets
-    let git_release = GithubApiClient::new()
-        .get_latest(crate::JACK2_GIT_REPO)
-        .expect("Could not get latest JACK2 git release!");
-
-    // Filter assets using search tags
-    let git_assets = git_release
-        .assets
-        .iter()
-        .cloned()
-        .filter(|asset| {
-            let name = asset.name.to_lowercase();
-            inc.iter().all(|i| name.contains(i)) && arch.iter().any(|a| name.contains(a))
-        })
-        .collect::<Vec<GithubAsset>>();
-
-    // TODO: Prompt user in event of multiple files
-    assert_eq!(git_assets.len(), 1);
-    let git_asset = git_assets[0].clone();
-
-    // Build paths
-    let exe_path = std::env::current_exe()?;
-    let exe_dir = exe_path.parent().unwrap();
-    let file_path = exe_dir.join(&git_asset.name);
-
-    // Download asset
-    file::download_file(
-        git_asset.browser_download_url.as_str(),
-        &file_path,
-        progress_tx.clone(),
-    )?;
-
-    // Install & clean up
-    file::run_command(&file_path)?;
-    fs::remove_file(&file_path)?;
-
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-pub fn vmb(_progress_tx: mpsc::Sender<Event>) -> Result<()> {
-    Ok(file::winget(&[
-        "install --id=VB-Audio.Voicemeeter.Banana  -e",
-    ])?)
-}
-
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-pub fn khs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
-    let exe_path = std::env::current_exe()?;
-    let exe_dir = exe_path.parent().unwrap();
-
-    #[cfg(target_os = "windows")]
-    let file_path = exe_dir.join("kilohearts_installer.exe");
-    #[cfg(target_os = "macos")]
-    let file_path = exe_dir.join("kilohearts_installer.dmg");
-
-    // Install & clean up
-    file::download_file(crate::KHS_URL, &file_path, progress_tx)?;
-    file::run_command(&file_path)?;
-    fs::remove_file(&file_path)?;
-
-    Ok(())
-}
-
-pub fn sbs(progress_tx: mpsc::Sender<Event>) -> Result<()> {
-    // Build search tags per operating system
-    #[cfg(target_os = "windows")]
-    let inc = vec!["win", "exe"];
-    #[cfg(target_os = "macos")]
-    let inc = vec!["mac", "dmg"];
-
-    // TODO: Prompt user for version instead of defaulting to latest.
-    // Get latest OBS release assets
-    let git_release = GithubApiClient::new()
-        .get_latest(crate::SONOBUS_GIT_REPO)
-        .expect("Could not get latest OBS git release!");
-
-    // Filter OBS assets using search tags
-    let git_assets = git_release
-        .assets
-        .iter()
-        .cloned()
-        .filter(|asset| {
-            let name = asset.name.to_lowercase();
-            inc.iter().all(|i| name.contains(i))
-        })
-        .collect::<Vec<GithubAsset>>();
-
-    // TODO: Prompt user in event of multiple files
-    assert_eq!(git_assets.len(), 1);
-    let git_asset = git_assets[0].clone();
-
-    // Build paths
-    let exe_path = std::env::current_exe()?;
-    let exe_dir = exe_path.parent().unwrap();
-    let file_path = exe_dir.join(&git_asset.name);
-
-    // Download asset
-    file::download_file(
-        git_asset.browser_download_url.as_str(),
-        &file_path,
-        progress_tx.clone(),
-    )?;
-
-    // Install & clean up
-    file::run_command(&file_path)?;
-    fs::remove_file(&file_path)?;
-
-    Ok(())
 }

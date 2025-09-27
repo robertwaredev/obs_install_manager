@@ -13,11 +13,6 @@ pub struct GithubRepo {
 pub struct GithubApiClient(Client);
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
-pub struct GithubReleases {
-    pub releases: Vec<GithubRelease>,
-}
-
-#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct GithubRelease {
     pub url: String,
     pub assets_url: String,
@@ -89,18 +84,18 @@ impl GithubApiClient {
         )
     }
 
-    pub fn get_releases(&self, repo: GithubRepo) -> Result<GithubReleases> {
+    pub fn get_releases(&self, repo: GithubRepo) -> Result<Vec<GithubRelease>> {
         let mut url = PathBuf::new();
         url.push(GIT_REPO_API);
         url.push(repo.author);
         url.push(repo.name);
         url.push("releases");
-        let url = url.to_str().expect("GitRepo struct is not valid UTF-8.");
+        let url = url.to_str().expect("GitRepo struct is not valid unicode.");
 
         let response = self.0.get(url).send()?;
         match response.status() {
             reqwest::StatusCode::OK => response
-                .json::<GithubReleases>()
+                .json::<Vec<GithubRelease>>()
                 .map_err(|e| eyre!("JSON decode error: {}", e)),
             reqwest::StatusCode::NOT_FOUND => Err(eyre!("(404) Repository not found.")),
             reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),
@@ -158,6 +153,14 @@ impl GithubAsset {
 pub mod tests {
     use super::*;
     use crate::OBS_GIT_REPO;
+
+    #[test]
+    fn test_git_api_client_get_releases() {
+        println!(
+            "{:?}",
+            GithubApiClient::new().get_releases(OBS_GIT_REPO).unwrap()
+        );
+    }
 
     #[test]
     fn test_git_api_client_get_latest() {

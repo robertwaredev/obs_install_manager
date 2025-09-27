@@ -15,20 +15,18 @@ pub const OBS_GIT_REPO: GithubRepo = GithubRepo {
     name: "obs-studio",
 };
 
-#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub const JACK2_GIT_REPO: GithubRepo = GithubRepo {
     author: "jackaudio",
     name: "jack2-releases",
 };
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
 pub const SONOBUS_GIT_REPO: GithubRepo = GithubRepo {
     author: "sonosaurus",
     name: "sonobus",
 };
 
-#[cfg(target_os = "windows")]
 pub const VMB_URL: &str = "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v2119.zip";
+
 #[cfg(target_os = "windows")]
 pub const KHS_URL: &str = "https://kilohearts.com/data/install/_/win";
 #[cfg(target_os = "macos")]

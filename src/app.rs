@@ -1,4 +1,5 @@
-use crate::ui::{self, InstallItem, Item, ItemKind, ListItemExecution};
+use crate::install::{self, Installer};
+use crate::ui::{self, ActionItem};
 pub use color_eyre::Result;
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::prelude::*;
@@ -12,8 +13,6 @@ pub enum Screen {
 
 pub enum Event {
     Key(KeyEvent),
-    List(Vec<Item>),
-    Screen(Screen),
     Progress(f64),
 }
 
@@ -42,27 +41,27 @@ impl App {
         let (evtx, evrx) = mpsc::channel::<Event>();
 
         let items = vec![
-            Item::new(
-                ItemKind::Install(InstallItem::Obs),
+            ActionItem::new(
+                Installer::Obs(install::Obs::default()),
                 "Install OBS (Open Broadcast Software)".to_string(),
             ),
             #[cfg(target_os = "windows")]
-            Item::new(
-                ItemKind::Install(InstallItem::Vmb),
+            ActionItem::new(
+                Installer::Vmb(install::Vmb),
                 "Install Voicemeeter Banana".to_string(),
             ),
             #[cfg(target_os = "linux")]
-            Item::new(
-                ItemKind::Install(InstallItem::Ja2),
+            ActionItem::new(
+                Installer::Ja2(install::Ja2::default()),
                 "Install Jack Audio Connection Kit".to_string(),
             ),
-            Item::new(
-                ItemKind::Install(InstallItem::Khs),
+            ActionItem::new(
+                Installer::Khs(install::Khs),
                 "Install Kilohearts Bundle".to_string(),
             ),
             #[cfg(any(target_os = "windows", target_os = "macos"))]
-            Item::new(
-                ItemKind::Install(InstallItem::Sbs),
+            ActionItem::new(
+                Installer::Sbs(install::Sbs::default()),
                 "Install Sonobus".to_string(),
             ),
         ];
@@ -104,18 +103,22 @@ impl App {
     }
 
     pub fn run(&mut self, mut term: DefaultTerminal) -> Result<()> {
-        let key_tx = self.evtx.clone();
+        term.draw(|frame| self.draw(frame))?;
+
+        let evtx = self.evtx.clone();
         thread::spawn(move || {
-            send_key_event(key_tx);
+            send_key_event(evtx);
         });
 
         while !self.exit {
             match self.evrx.recv()? {
-                Event::Key(key_event) => self.handle_key_event(key_event),
+                Event::Key(key_event) => {
+                    if self.pbar.ratio == 0.0 {
+                        self.handle_key_event(key_event)?
+                    }
+                }
                 Event::Progress(ratio) => self.pbar.set_ratio(ratio),
-                Event::List(_items) => (),
-                Event::Screen(_screen) => (),
-            };
+            }
 
             term.draw(|frame| self.draw(frame))?;
         }
@@ -127,28 +130,26 @@ impl App {
         frame.render_widget(self, frame.area());
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
+    fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
         if KeyEventKind::Press == key_event.kind {
-            match key_event.code {
+            return Ok(match key_event.code {
                 KeyCode::Up => self.list.state.select_previous(),
                 KeyCode::Down => self.list.state.select_next(),
-                KeyCode::Enter => self.select_accept(),
+                KeyCode::Enter => self.select_accept()?,
                 KeyCode::Esc => self.exit(),
-                _ => {}
-            }
+                _ => (),
+            });
         }
+        Ok(())
     }
 
-    fn select_accept(&mut self) {
+    fn select_accept(&mut self) -> Result<()> {
         if let Some(selected) = self.list.state.selected() {
             let tx = self.evtx.clone();
             let item = self.list.items[selected].clone();
-
-            thread::spawn(move || match item.kind {
-                ItemKind::Install(install_item) => install_item.execute(tx),
-                ItemKind::Release => Ok(()),
-            });
+            thread::spawn(move || item.execute(tx));
         }
+        Ok(())
     }
 
     fn exit(&mut self) {
