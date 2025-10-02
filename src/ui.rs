@@ -109,11 +109,11 @@ impl ActionItem {
 
     pub fn execute(&self, tx: mpsc::Sender<app::Event>) -> Result<()> {
         match &self.kind {
-            Installer::Obs(i) => i.install(tx)?,
-            Installer::Vmb(i) => i.install(tx)?,
-            Installer::Ja2(i) => i.install(tx)?,
-            Installer::Khs(i) => i.install(tx)?,
-            Installer::Sbs(i) => i.install(tx)?,
+            Installer::Obs(i) => i.install(&tx)?,
+            Installer::Vmb(i) => i.install(&tx)?,
+            Installer::Ja2(i) => i.install(&tx)?,
+            Installer::Khs(i) => i.install(&tx)?,
+            Installer::Sbs(i) => i.install(&tx)?,
         }
         Ok(())
     }

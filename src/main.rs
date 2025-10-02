@@ -30,6 +30,9 @@ pub const SONOBUS_GIT_REPO: GithubRepo = GithubRepo {
     name: "sonobus",
 };
 
+pub const OBS_CONFIG: &str =
+    "https://github.com/robertwaredev/daw-obs-config/archive/refs/heads/master.zip";
+
 pub const VMB_URL: &str = "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v2119.zip";
 
 #[cfg(target_os = "windows")]

@@ -3,7 +3,7 @@ use color_eyre::{Result, eyre::eyre};
 use std::{fs, os, sync::mpsc};
 
 pub trait Installable {
-    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()>;
+    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()>;
 }
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ pub struct Obs {
 }
 
 impl Installable for Obs {
-    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
         // Build search tags per operating system
         #[cfg(target_os = "windows")]
         let (inc, exc) = (vec!["windows", "zip"], vec!["pdb"]);
@@ -60,7 +60,7 @@ impl Installable for Obs {
             })
             .collect::<Vec<GithubAsset>>();
 
-        let git_asset = git_assets[0].clone();
+        let git_asset = git_assets.first().expect("Empty asset list!");
 
         // Build paths
         let exe_path = std::env::current_exe()?;
@@ -75,7 +75,7 @@ impl Installable for Obs {
         }
 
         // Download asset
-        file::download(&git_asset.browser_download_url, &file_path, tx.clone())?;
+        file::download(&git_asset.browser_download_url, &file_path, tx)?;
 
         // Windows setup
         #[cfg(target_os = "windows")]
@@ -95,39 +95,52 @@ impl Installable for Obs {
 
             // Symlink config link folder
             let link_config = obs_dir.join("config");
-            os::windows::fs::symlink_dir(true_config, link_config)?;
+            os::windows::fs::symlink_dir(&true_config, &link_config)?;
 
-            // OBS ASIO PLUGIN
+            // OBS ASIO Plugin
+            {
+                // Build search tags
+                let inc = vec!["zip"];
 
-            // Build search tags
-            let inc = vec!["zip"];
+                // Get latest OBS release assets
+                let git_release = GithubApiClient::new()
+                    .get_latest(crate::OBS_ASIO_GIT_REPO)
+                    .expect("Could not get latest git release!");
 
-            // TODO: Prompt user for version instead of defaulting to latest.
-            // Get latest OBS release assets
-            let git_release = GithubApiClient::new()
-                .get_latest(crate::OBS_ASIO_GIT_REPO)
-                .expect("Could not get latest git release!");
+                // Filter OBS assets using search tags
+                let git_assets = git_release
+                    .assets
+                    .iter()
+                    .cloned()
+                    .filter(|asset| {
+                        let name = asset.name.to_lowercase();
+                        inc.iter().all(|i| name.contains(i))
+                    })
+                    .collect::<Vec<GithubAsset>>();
 
-            // Filter OBS assets using search tags
-            let git_assets = git_release
-                .assets
-                .iter()
-                .cloned()
-                .filter(|asset| {
-                    let name = asset.name.to_lowercase();
-                    inc.iter().all(|i| name.contains(i))
-                })
-                .collect::<Vec<GithubAsset>>();
+                let git_asset = git_assets.first().expect("Empty asset list!");
+                let file_path = exe_dir.join(&git_asset.name);
 
-            let git_asset = git_assets[0].clone();
-            let file_path = exe_dir.join(&git_asset.name);
+                // Download asset
+                file::download(&git_asset.browser_download_url, &file_path, tx)?;
+                file::extract_zip(&file_path, &obs_dir)?;
+                fs::remove_file(file_path)?;
+            }
 
-            // Download asset
-            file::download(&git_asset.browser_download_url, &file_path, tx)?;
+            // OBS Profile & Scene Collection
+            {
+                let zip_path = exe_dir.join("daw-obs-config-master.zip");
+                file::download(&crate::OBS_CONFIG.to_string(), &zip_path, tx)?;
+                file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
+                fs::remove_file(zip_path)?;
+            }
 
-            // Extract ZIP
-            file::extract_zip(&file_path, &obs_dir)?;
-            fs::remove_file(file_path)?;
+            // OBS shortcut
+            {
+                let scut_path = exe_dir.join("OBS.lnk");
+                let target_path = obs_dir.join("bin/64bit/obs64.exe");
+                scut::create_shortcut(scut_path, target_path)?;
+            }
         }
 
         // Unix setup
@@ -148,14 +161,6 @@ impl Installable for Obs {
             // TODO: Create shortcut
         }
 
-        // Create shortcut
-        #[cfg(target_os = "windows")]
-        {
-            let scut_path = exe_dir.join("OBS.lnk");
-            let target_path = obs_dir.join("bin/64bit/obs64.exe");
-            scut::create_shortcut(scut_path, target_path)?;
-        }
-
         // Open directory
         opener::open(exe_dir)?;
 
@@ -171,7 +176,7 @@ pub struct Ja2 {
 }
 
 impl Installable for Ja2 {
-    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
         // Build search tags per operating system
         #[cfg(target_os = "windows")]
         let inc = vec!["win"];
@@ -209,7 +214,7 @@ impl Installable for Ja2 {
             })
             .collect::<Vec<GithubAsset>>();
 
-        let git_asset = git_assets[0].clone();
+        let git_asset = git_assets.first().expect("Empty asset list!");
 
         // Build paths
         let exe_path = std::env::current_exe()?;
@@ -231,7 +236,7 @@ impl Installable for Ja2 {
 pub struct Vmb;
 
 impl Installable for Vmb {
-    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
 
@@ -257,7 +262,7 @@ impl Installable for Vmb {
 pub struct Khs;
 
 impl Installable for Khs {
-    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
 
@@ -283,7 +288,7 @@ pub struct Sbs {
 }
 
 impl Installable for Sbs {
-    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
         // Build search tags per operating system
         #[cfg(target_os = "windows")]
         let inc = vec!["win", "exe"];
@@ -312,7 +317,7 @@ impl Installable for Sbs {
             })
             .collect::<Vec<GithubAsset>>();
 
-        let git_asset = git_assets[0].clone();
+        let git_asset = git_assets.first().expect("Empty asset list!");
 
         // Build paths
         let exe_path = std::env::current_exe()?;

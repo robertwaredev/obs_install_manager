@@ -19,7 +19,7 @@ pub fn send_key_event(tx: mpsc::Sender<Event>) {
     }
 }
 
-pub fn send_progress_event(ratio: f64, tx: mpsc::Sender<Event>) {
+pub fn send_progress_event(ratio: f64, tx: &mpsc::Sender<Event>) {
     tx.send(Event::Progress(ratio)).unwrap()
 }
 
@@ -135,7 +135,7 @@ impl App {
         if let Some(selected) = self.list.state.selected() {
             let tx = self.evtx.clone();
             let item = self.list.items[selected].clone();
-            thread::spawn(move || item.execute(tx));
+            thread::spawn(move || -> Result<()> { item.execute(tx) });
         }
         Ok(())
     }

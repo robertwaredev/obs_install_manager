@@ -11,7 +11,7 @@ use std::{
 pub fn download<P: AsRef<Path>>(
     url: &String,
     file_path: P,
-    progress_tx: mpsc::Sender<Event>,
+    progress_tx: &mpsc::Sender<Event>,
 ) -> Result<()> {
     let mut response = reqwest::blocking::get(url)?;
     let mut file = fs::File::create(file_path)?;
@@ -26,11 +26,10 @@ pub fn download<P: AsRef<Path>>(
             file.write_all(&buffer[..n])?;
             downloaded += n as u64;
             let ratio = downloaded as f64 / total_size as f64;
-            send_progress_event(ratio, progress_tx.clone());
+            send_progress_event(ratio, progress_tx);
         }
 
-        send_progress_event(0.0, progress_tx);
-        Ok(())
+        Ok(send_progress_event(0.0, progress_tx))
     } else {
         Err(eyre!("Total file download size could not be determined!"))
     }
