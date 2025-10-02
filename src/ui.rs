@@ -37,7 +37,7 @@ impl ProgressBar {
 
         let gauge = Gauge::default()
             .block(block)
-            .gauge_style(Style::default().blue())
+            .gauge_style(Style::default().green())
             .ratio(self.ratio);
 
         Widget::render(gauge, area, buf);
@@ -84,7 +84,7 @@ impl<'a> StatefulList<'a> {
 
         let list = List::new(items)
             .block(block)
-            .highlight_symbol("▶ ")
+            .highlight_symbol("> ")
             .highlight_style(HIGHLIGHT_STYLE)
             .highlight_spacing(HighlightSpacing::Always);
 

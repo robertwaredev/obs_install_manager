@@ -60,15 +60,13 @@ impl Installable for Obs {
             })
             .collect::<Vec<GithubAsset>>();
 
-        // TODO: Prompt user in event of multiple files
-        assert_eq!(git_assets.len(), 1);
         let git_asset = git_assets[0].clone();
 
         // Build paths
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
         let file_path = exe_dir.join(&git_asset.name);
-        let file_name = file::remove_extension(&git_asset.name);
+        let file_name = file_path.file_stem().unwrap();
         let obs_dir = exe_dir.join(file_name);
 
         if obs_dir.exists() || file_path.exists() {
@@ -77,8 +75,9 @@ impl Installable for Obs {
         }
 
         // Download asset
-        file::download_file(git_asset.browser_download_url.as_str(), &file_path, tx)?;
+        file::download(&git_asset.browser_download_url, &file_path, tx.clone())?;
 
+        // Windows setup
         #[cfg(target_os = "windows")]
         {
             // Extract ZIP
@@ -98,12 +97,40 @@ impl Installable for Obs {
             let link_config = obs_dir.join("config");
             os::windows::fs::symlink_dir(true_config, link_config)?;
 
-            // Create shortcut
-            let scut_path = exe_dir.join("OBS.lnk");
-            let target_path = obs_dir.join("bin/64bit/obs64.exe");
-            scut::create_shortcut(scut_path, target_path)?;
+            // OBS ASIO PLUGIN
+
+            // Build search tags
+            let inc = vec!["zip"];
+
+            // TODO: Prompt user for version instead of defaulting to latest.
+            // Get latest OBS release assets
+            let git_release = GithubApiClient::new()
+                .get_latest(crate::OBS_ASIO_GIT_REPO)
+                .expect("Could not get latest git release!");
+
+            // Filter OBS assets using search tags
+            let git_assets = git_release
+                .assets
+                .iter()
+                .cloned()
+                .filter(|asset| {
+                    let name = asset.name.to_lowercase();
+                    inc.iter().all(|i| name.contains(i))
+                })
+                .collect::<Vec<GithubAsset>>();
+
+            let git_asset = git_assets[0].clone();
+            let file_path = exe_dir.join(&git_asset.name);
+
+            // Download asset
+            file::download(&git_asset.browser_download_url, &file_path, tx)?;
+
+            // Extract ZIP
+            file::extract_zip(&file_path, &obs_dir)?;
+            fs::remove_file(file_path)?;
         }
 
+        // Unix setup
         #[cfg(target_family = "unix")]
         {
             // TODO: Run and rename installation according to version number
@@ -119,6 +146,14 @@ impl Installable for Obs {
             os::unix::fs::symlink(true_config, link_config)?;
 
             // TODO: Create shortcut
+        }
+
+        // Create shortcut
+        #[cfg(target_os = "windows")]
+        {
+            let scut_path = exe_dir.join("OBS.lnk");
+            let target_path = obs_dir.join("bin/64bit/obs64.exe");
+            scut::create_shortcut(scut_path, target_path)?;
         }
 
         // Open directory
@@ -143,7 +178,7 @@ impl Installable for Ja2 {
         #[cfg(target_os = "macos")]
         let inc = vec!["macos"];
         #[cfg(target_os = "linux")]
-        let inc = vec!["ubuntu"];
+        let inc = vec!["linux"];
 
         // Build search tags per cpu architecture
         #[cfg(any(target_arch = "x86"))]
@@ -182,9 +217,59 @@ impl Installable for Ja2 {
         let file_path = exe_dir.join(&git_asset.name);
 
         // Download asset
-        file::download_file(git_asset.browser_download_url.as_str(), &file_path, tx)?;
+        file::download(&git_asset.browser_download_url, &file_path, tx)?;
 
         // Install & clean up
+        file::run(&file_path)?;
+        fs::remove_file(&file_path)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Vmb;
+
+impl Installable for Vmb {
+    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+
+        let zip_path = exe_dir.join("voicemeeter_banana_installer.zip");
+        let file_path = exe_dir.join("voicemeeterprosetup.exe");
+
+        // Install & clean up
+        if !zip_path.exists() && !file_path.exists() {
+            file::download(&crate::VMB_URL.to_string(), &zip_path, tx)?;
+            file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
+            fs::remove_file(&zip_path)?;
+        }
+
+        // Open directory
+        file::run(&file_path)?;
+        fs::remove_file(&file_path)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Khs;
+
+impl Installable for Khs {
+    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+
+        #[cfg(target_os = "windows")]
+        let file_path = exe_dir.join("kilohearts_installer.exe");
+        #[cfg(target_os = "macos")]
+        let file_path = exe_dir.join("kilohearts_installer.dmg");
+
+        // Install & clean up
+        if !file_path.exists() {
+            file::download(&crate::KHS_URL.to_string(), &file_path, tx)?;
+        }
         file::run(&file_path)?;
         fs::remove_file(&file_path)?;
 
@@ -235,59 +320,9 @@ impl Installable for Sbs {
         let file_path = exe_dir.join(&git_asset.name);
 
         // Download asset
-        file::download_file(git_asset.browser_download_url.as_str(), &file_path, tx)?;
+        file::download(&git_asset.browser_download_url, &file_path, tx)?;
 
         // Install & clean up
-        file::run(&file_path)?;
-        fs::remove_file(&file_path)?;
-
-        Ok(())
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct Vmb;
-
-impl Installable for Vmb {
-    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
-        let exe_path = std::env::current_exe()?;
-        let exe_dir = exe_path.parent().unwrap();
-
-        let zip_path = exe_dir.join("voicemeeter_banana_installer.zip");
-        let exe_path = exe_dir.join("voicemeeterprosetup.exe");
-
-        // Install & clean up
-        if !zip_path.exists() && !exe_path.exists() {
-            file::download_file(crate::VMB_URL, &zip_path, tx)?;
-            file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
-            fs::remove_file(&zip_path)?;
-        }
-
-        // Open directory
-        file::run(&exe_path)?;
-        fs::remove_file(&exe_path)?;
-
-        Ok(())
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct Khs;
-
-impl Installable for Khs {
-    fn install(&self, tx: mpsc::Sender<Event>) -> Result<()> {
-        let exe_path = std::env::current_exe()?;
-        let exe_dir = exe_path.parent().unwrap();
-
-        #[cfg(target_os = "windows")]
-        let file_path = exe_dir.join("kilohearts_installer.exe");
-        #[cfg(target_os = "macos")]
-        let file_path = exe_dir.join("kilohearts_installer.dmg");
-
-        // Install & clean up
-        if !file_path.exists() {
-            file::download_file(crate::KHS_URL, &file_path, tx)?;
-        }
         file::run(&file_path)?;
         fs::remove_file(&file_path)?;
 

@@ -4,12 +4,12 @@ use std::{
     fs,
     io::{self, Read, Write},
     path::Path,
-    process::{Command, Stdio},
+    process::{Command, ExitStatus},
     sync::mpsc,
 };
 
-pub fn download_file<P: AsRef<Path>>(
-    url: &str,
+pub fn download<P: AsRef<Path>>(
+    url: &String,
     file_path: P,
     progress_tx: mpsc::Sender<Event>,
 ) -> Result<()> {
@@ -69,33 +69,6 @@ pub fn extract_zip<P: AsRef<Path>>(file_path: P, extract_dir: P) -> Result<()> {
     Ok(())
 }
 
-pub fn remove_extension(file_name: &String) -> &str {
-    Path::new(file_name)
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .expect("Could not remove extension!")
-}
-
-pub fn run<P: AsRef<Path>>(path: P) -> io::Result<i32> {
-    if !path.as_ref().exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("Path not valid: {:?}", path.as_ref()),
-        ));
-    }
-
-    let mut cmd = Command::new(path.as_ref().as_os_str());
-    let status = cmd
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
-
-    Ok(status.code().unwrap_or(-1))
-}
-
-#[cfg(target_os = "windows")]
-pub fn winget(args: &[&str]) -> Result<()> {
-    Command::new("winget").args(args).output()?;
-    Ok(())
+pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
+    Ok(Command::new(path.as_ref().as_os_str()).spawn()?.wait()?)
 }

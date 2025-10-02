@@ -6,11 +6,6 @@ use ratatui::prelude::*;
 use ratatui::{DefaultTerminal, widgets::*};
 use std::{sync::mpsc, thread};
 
-pub enum Screen {
-    Main,
-    Releases,
-}
-
 pub enum Event {
     Key(KeyEvent),
     Progress(f64),
@@ -45,16 +40,17 @@ impl App {
                 Installer::Obs(install::Obs::default()),
                 "Install OBS (Open Broadcast Software)".to_string(),
             ),
-            #[cfg(target_os = "windows")]
-            ActionItem::new(
-                Installer::Vmb(install::Vmb),
-                "Install Voicemeeter Banana".to_string(),
-            ),
-            #[cfg(target_os = "linux")]
+            // #[cfg(target_os = "windows")]
+            // ActionItem::new(
+            //     Installer::Vmb(install::Vmb),
+            //     "Install Voicemeeter Banana".to_string(),
+            // ),
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
             ActionItem::new(
                 Installer::Ja2(install::Ja2::default()),
                 "Install Jack Audio Connection Kit".to_string(),
             ),
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
             ActionItem::new(
                 Installer::Khs(install::Khs),
                 "Install Kilohearts Bundle".to_string(),
@@ -66,20 +62,12 @@ impl App {
             ),
         ];
         let state = ListState::default().with_selected(Some(0));
-        let header = Line::from(" OBS Install Manager ");
-        let footer = Line::from(vec![
-            " Up ".green().into(),
-            "<↑>".green().bold(),
-            " -".bold(),
-            " Down ".green().into(),
-            "<↓>".green().bold(),
-            " -".bold(),
-            " Accept ".blue().into(),
-            "<Enter>".blue().bold(),
-            " -".bold(),
-            " Exit ".red().into(),
-            "<Esc> ".red().bold(),
-        ]);
+        let header = Line::from(" OBS Install Manager ".bold());
+        let footer = Line::from(
+            [" Up <↑>", "Down <↓>", "Accept <Enter>", "Exit <Esc> "]
+                .join(" - ")
+                .bold(),
+        );
 
         let list = ui::StatefulList {
             items,

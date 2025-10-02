@@ -15,6 +15,11 @@ pub const OBS_GIT_REPO: GithubRepo = GithubRepo {
     name: "obs-studio",
 };
 
+pub const OBS_ASIO_GIT_REPO: GithubRepo = GithubRepo {
+    author: "andersama",
+    name: "obs-asio",
+};
+
 pub const JACK2_GIT_REPO: GithubRepo = GithubRepo {
     author: "jackaudio",
     name: "jack2-releases",
