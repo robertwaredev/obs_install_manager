@@ -85,18 +85,21 @@ pub struct GithubAuthor {
 pub struct GithubApiClient(Client);
 
 impl GithubApiClient {
-    pub fn new() -> Self {
-        Self(
+    pub fn new() -> Result<Self> {
+        let client = Self(
             reqwest::blocking::Client::builder()
-                .user_agent("github-api-http-client/1.0")
+                .user_agent("github-api-client/1.0")
                 .build()
-                .expect("Could not create Github API HTTP client."),
-        )
+                .map_err(|e| eyre!("Could not create GithubApiClient. {}", e))?,
+        );
+        Ok(client)
     }
 
     pub fn get_releases(&self, repo: &GithubRepo) -> Result<Vec<GithubRelease>> {
         let url = repo.url();
-        let url = url.to_str().expect("GithubRepo is not valid unicode.");
+        let url = url
+            .to_str()
+            .ok_or_else(|| eyre!("GithubRepo is not valid unicode."))?;
         self.parse_json::<Vec<GithubRelease>>(url)
     }
 
@@ -109,41 +112,21 @@ impl GithubApiClient {
             url.push("latest");
         }
 
-        let url = url.to_str().expect("GithubRepo is not valid unicode.");
+        let url = url
+            .to_str()
+            .ok_or_else(|| eyre!("GithubRepo or id is not valid unicode."))?;
         self.parse_json::<GithubRelease>(url)
     }
 
+    #[rustfmt::skip]
     fn parse_json<T: DeserializeOwned>(&self, url: impl IntoUrl) -> Result<T> {
         let response = self.0.get(url).send()?;
         match response.status() {
-            reqwest::StatusCode::OK => response
-                .json::<T>()
-                .map_err(|e| eyre!("JSON decode error: {}", e)),
+            reqwest::StatusCode::OK => response.json::<T>().map_err(|e| eyre!("JSON decode error: {}", e)),
             reqwest::StatusCode::NOT_FOUND => Err(eyre!("(404) Repository not found.")),
             reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),
-            status => {
-                let error_body = response.text()?;
-                Err(eyre!("HTTP {}: {}", status, error_body))
-            }
+            status => Err(eyre!("HTTP {}: {}", status, response.text()?)),
         }
-    }
-}
-
-impl GithubAsset {
-    pub fn size_bytes(&self) -> f64 {
-        self.size as f64
-    }
-
-    pub fn size_kilobytes(&self) -> f64 {
-        self.size_bytes() / 1024.0
-    }
-
-    pub fn size_megabytes(&self) -> f64 {
-        self.size_kilobytes() / 1024.0
-    }
-
-    pub fn size_gigabytes(&self) -> f64 {
-        self.size_megabytes() / 1024.0
     }
 }
 
@@ -156,6 +139,7 @@ pub mod tests {
         println!(
             "{:?}",
             GithubApiClient::new()
+                .unwrap()
                 .get_releases(&crate::OBS_GIT_REPO)
                 .unwrap()
         );
@@ -166,6 +150,7 @@ pub mod tests {
         println!(
             "{:?}",
             GithubApiClient::new()
+                .unwrap()
                 .get_release(&crate::OBS_GIT_REPO, &None)
                 .unwrap()
         );

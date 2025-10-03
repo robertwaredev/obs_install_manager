@@ -1,4 +1,4 @@
-use color_eyre::eyre::{Result, eyre};
+use color_eyre::{Result, eyre::eyre};
 use mslnk::ShellLink;
 use std::path::Path;
 

@@ -1,45 +1,47 @@
 use crate::app::{Event, send_progress_event};
-use color_eyre::{Result, eyre::eyre};
+use color_eyre::Result;
+use curl::easy::{Easy, WriteError};
 use std::{
     fs,
-    io::{self, Read, Write},
+    io::{self, Write},
     path::Path,
     process::{Command, ExitStatus},
     sync::mpsc,
 };
 
 pub fn download<P: AsRef<Path>>(
-    url: &String,
-    file_path: P,
+    url: &str,
+    path: P,
     progress_tx: &mpsc::Sender<Event>,
 ) -> Result<()> {
-    let mut response = reqwest::blocking::get(url)?;
-    let mut file = fs::File::create(file_path)?;
-    let mut buffer = [0u8; 8192];
-    let mut downloaded = 0u64;
+    let mut easy = Easy::new();
+    easy.url(url)?;
+    easy.follow_location(true)?;
+    easy.progress(true)?;
 
-    if let Some(total_size) = response.content_length() {
-        while let Ok(n) = response.read(&mut buffer) {
-            if n == 0 {
-                break;
-            }
-            file.write_all(&buffer[..n])?;
-            downloaded += n as u64;
-            let ratio = downloaded as f64 / total_size as f64;
-            send_progress_event(ratio, progress_tx);
+    let mut file = fs::File::create(path)?;
+    let mut transfer = easy.transfer();
+
+    transfer.write_function(move |data| {
+        file.write_all(data).map_err(|_| WriteError::Pause)?;
+        Ok(data.len())
+    })?;
+
+    transfer.progress_function(|dltotal, dlnow, _, _| {
+        if dltotal > 0.0 {
+            send_progress_event(dlnow / dltotal, progress_tx);
         }
+        true
+    })?;
 
-        Ok(send_progress_event(0.0, progress_tx))
-    } else {
-        Err(eyre!("Total file download size could not be determined!"))
-    }
+    transfer.perform()?;
+    send_progress_event(0.0, progress_tx);
+    Ok(())
 }
 
 // TODO: Set up progress bar for extract
 pub fn extract_zip<P: AsRef<Path>>(file_path: P, extract_dir: P) -> Result<()> {
-    let file = fs::File::open(file_path)?;
-    let reader = io::BufReader::new(file);
-    let mut archive = zip::ZipArchive::new(reader)?;
+    let mut archive = zip::ZipArchive::new(io::BufReader::new(fs::File::open(file_path)?))?;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
@@ -51,17 +53,7 @@ pub fn extract_zip<P: AsRef<Path>>(file_path: P, extract_dir: P) -> Result<()> {
             if let Some(parent) = extract_path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            let mut outfile = fs::File::create(&extract_path)?;
-            io::copy(&mut file, &mut outfile)?;
-        }
-
-        // Set permissions on Unix systems
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if let Some(mode) = file.unix_mode() {
-                std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))?;
-            }
+            io::copy(&mut file, &mut fs::File::create(&extract_path)?)?;
         }
     }
 

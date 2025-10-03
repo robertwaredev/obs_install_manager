@@ -1,6 +1,6 @@
 use crate::install::{self, Installer};
 use crate::ui::{self, ActionItem};
-pub use color_eyre::Result;
+pub use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::prelude::*;
 use ratatui::{DefaultTerminal, widgets::*};
@@ -45,12 +45,10 @@ impl App {
             //     Installer::Vmb(install::Vmb),
             //     "Install Voicemeeter Banana".to_string(),
             // ),
-            #[cfg(any(target_os = "windows", target_os = "macos"))]
             ActionItem::new(
                 Installer::Ja2(install::Ja2::default()),
                 "Install Jack Audio Connection Kit".to_string(),
             ),
-            #[cfg(any(target_os = "windows", target_os = "macos"))]
             ActionItem::new(
                 Installer::Khs(install::Khs),
                 "Install Kilohearts Bundle".to_string(),
@@ -120,14 +118,14 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
         if KeyEventKind::Press == key_event.kind {
-            return Ok(match key_event.code {
+            match key_event.code {
                 KeyCode::Up => self.list.state.select_previous(),
                 KeyCode::Down => self.list.state.select_next(),
                 KeyCode::Enter => self.select_accept()?,
                 KeyCode::Esc => self.exit(),
                 _ => (),
-            });
-        }
+            }
+        };
         Ok(())
     }
 
@@ -135,7 +133,7 @@ impl App {
         if let Some(selected) = self.list.state.selected() {
             let tx = self.evtx.clone();
             let item = self.list.items[selected].clone();
-            thread::spawn(move || -> Result<()> { item.execute(tx) });
+            thread::spawn(move || -> Result<()> { item.execute(tx).map_err(|e| eyre!("{e}")) });
         }
         Ok(())
     }

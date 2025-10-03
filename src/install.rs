@@ -1,9 +1,12 @@
 use crate::{app::Event, file, git::*, scut};
-use color_eyre::{Result, eyre::eyre};
-use std::{fs, os, sync::mpsc};
+use color_eyre::{
+    Result,
+    eyre::{OptionExt, eyre},
+};
+use std::{fs, os, sync::mpsc::Sender};
 
 pub trait Installable {
-    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()>;
+    fn install(&self, tx: &Sender<Event>) -> Result<()>;
 }
 
 #[derive(Clone)]
@@ -21,7 +24,9 @@ pub struct Obs {
 }
 
 impl Installable for Obs {
-    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &Sender<Event>) -> Result<()> {
+        let github_api_client = GithubApiClient::new()?;
+
         // Build search tags per operating system
         #[cfg(target_os = "windows")]
         let (inc, exc) = (vec!["windows", "zip"], vec!["pdb"]);
@@ -37,8 +42,7 @@ impl Installable for Obs {
         let arch = vec!["arm", "apple"];
 
         // Get latest OBS release assets
-        let git_release =
-            GithubApiClient::new().get_release(&crate::OBS_GIT_REPO, &self.version)?;
+        let git_release = github_api_client.get_release(&crate::OBS_GIT_REPO, &self.version)?;
 
         // Filter OBS assets using search tags
         let git_assets = git_release
@@ -52,32 +56,32 @@ impl Installable for Obs {
             })
             .collect::<Vec<GithubAsset>>();
 
-        let git_asset = git_assets.first().expect("Empty asset list!");
+        let git_asset = git_assets.first().ok_or_eyre("GithubAsset vec is empty!")?;
 
         // Build paths
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
-        let file_path = exe_dir.join(&git_asset.name);
-        let file_name = file_path.file_stem().unwrap();
-        let obs_dir = exe_dir.join(file_name);
+        let zip_path = exe_dir.join(&git_asset.name);
+        let zip_name = zip_path.file_stem().unwrap();
+        let extract_dir = exe_dir.join(&zip_name);
 
-        if obs_dir.exists() || file_path.exists() {
+        if extract_dir.exists() || zip_path.exists() {
             opener::open(exe_dir)?;
             return Err(eyre!("OBS is already installed!"));
         }
 
         // Download asset
-        file::download(&git_asset.browser_download_url, &file_path, tx)?;
+        file::download(&git_asset.browser_download_url, &zip_path, tx)?;
 
         // Windows setup
         #[cfg(target_os = "windows")]
         {
             // Extract ZIP
-            file::extract_zip(&file_path, &obs_dir)?;
-            fs::remove_file(file_path)?;
+            file::extract_zip(&zip_path, &extract_dir)?;
+            fs::remove_file(&zip_path)?;
 
             // Enable portable mode
-            fs::File::create(obs_dir.join("portable_mode"))?;
+            fs::File::create(extract_dir.join("portable_mode"))?;
 
             // Create config true folder
             let true_config = exe_dir.join("obs-config");
@@ -86,16 +90,16 @@ impl Installable for Obs {
             }
 
             // Symlink config link folder
-            let link_config = obs_dir.join("config");
+            let link_config = extract_dir.join("config");
             os::windows::fs::symlink_dir(&true_config, &link_config)?;
 
             // OBS ASIO Plugin
             {
-                // Get latest OBS release assets
+                // Get latest release assets
                 let git_release =
-                    GithubApiClient::new().get_release(&crate::OBS_ASIO_GIT_REPO, &self.version)?;
+                    github_api_client.get_release(&crate::OBS_ASIO_GIT_REPO, &self.version)?;
 
-                // Filter OBS assets using search tags
+                // Filter assets using search tags
                 let git_assets = git_release
                     .assets
                     .iter()
@@ -103,17 +107,18 @@ impl Installable for Obs {
                     .filter(|asset| asset.name.to_lowercase().contains("zip"))
                     .collect::<Vec<GithubAsset>>();
 
-                let git_asset = git_assets.first().expect("Empty asset list!");
+                let git_asset = git_assets.first().ok_or_eyre("GithubAsset vec is empty!")?;
 
                 // Download asset
-                let file_path = exe_dir.join(&git_asset.name);
-                if !file_path.exists() {
-                    file::download(&git_asset.browser_download_url, &file_path, tx)?;
+                let zip_path = exe_dir.join(&git_asset.name);
+                if !zip_path.exists() {
+                    file::download(&git_asset.browser_download_url, &zip_path, tx)?;
                 }
-                file::extract_zip(&file_path, &obs_dir)?;
-                fs::remove_file(file_path)?;
+                file::extract_zip(&zip_path, &extract_dir)?;
+                fs::remove_file(&zip_path)?;
             }
 
+            // FIXME
             // OBS Profile & Scene Collection
             {
                 let zip_path = true_config.join("daw_obs_config_master.zip");
@@ -121,14 +126,14 @@ impl Installable for Obs {
                     file::download(&crate::OBS_CONFIG.to_string(), &zip_path, tx)?;
                 }
                 file::extract_zip(&zip_path, &true_config)?;
-                fs::remove_file(zip_path)?;
+                fs::remove_file(&zip_path)?;
             }
 
             // OBS shortcut
             {
                 let scut_path = exe_dir.join("OBS.lnk");
                 if !scut_path.exists() {
-                    let target_path = obs_dir.join("bin/64bit/obs64.exe");
+                    let target_path = extract_dir.join("bin/64bit/obs64.exe");
                     scut::create_shortcut(scut_path, target_path)?;
                 }
             }
@@ -165,7 +170,7 @@ pub struct Ja2 {
 }
 
 impl Installable for Ja2 {
-    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &Sender<Event>) -> Result<()> {
         // Build search tags per operating system
         #[cfg(target_os = "windows")]
         let inc = vec!["win"];
@@ -184,7 +189,7 @@ impl Installable for Ja2 {
 
         // Get latest release assets
         let git_release =
-            GithubApiClient::new().get_release(&crate::JA2_GIT_REPO, &self.version)?;
+            GithubApiClient::new()?.get_release(&crate::JA2_GIT_REPO, &self.version)?;
 
         // Filter assets using search tags
         let git_assets = git_release
@@ -196,7 +201,7 @@ impl Installable for Ja2 {
             })
             .collect::<Vec<GithubAsset>>();
 
-        let git_asset = git_assets.first().expect("Empty asset list!");
+        let git_asset = git_assets.first().ok_or_eyre("GithubAsset vec is empty!")?;
 
         // Build paths
         let exe_path = std::env::current_exe()?;
@@ -218,7 +223,7 @@ impl Installable for Ja2 {
 pub struct Vmb;
 
 impl Installable for Vmb {
-    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &Sender<Event>) -> Result<()> {
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
         let zip_path = exe_dir.join("voicemeeter_banana_installer.zip");
@@ -243,7 +248,7 @@ impl Installable for Vmb {
 pub struct Khs;
 
 impl Installable for Khs {
-    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &Sender<Event>) -> Result<()> {
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
 
@@ -269,7 +274,7 @@ pub struct Sbs {
 }
 
 impl Installable for Sbs {
-    fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
+    fn install(&self, tx: &Sender<Event>) -> Result<()> {
         // Build search tags per operating system
         #[cfg(target_os = "windows")]
         let inc = vec!["win", "exe"];
@@ -278,7 +283,7 @@ impl Installable for Sbs {
 
         // Get latest OBS release assets
         let git_release =
-            GithubApiClient::new().get_release(&crate::SBS_GIT_REPO, &self.version)?;
+            GithubApiClient::new()?.get_release(&crate::SBS_GIT_REPO, &self.version)?;
 
         // Filter OBS assets using search tags
         let git_assets = git_release
@@ -290,7 +295,8 @@ impl Installable for Sbs {
             })
             .collect::<Vec<GithubAsset>>();
 
-        let git_asset = git_assets.first().expect("Empty asset list!");
+        let git_asset = git_assets.first().ok_or_eyre("GithubAsset vec is empty!")?;
+
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
         let file_path = exe_dir.join(&git_asset.name);
