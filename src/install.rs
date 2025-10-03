@@ -36,11 +36,10 @@ impl Installable for Obs {
         #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
         let arch = vec!["arm", "apple"];
 
-        // TODO: Prompt user for version instead of defaulting to latest.
         // Get latest OBS release assets
         let git_release = match &self.version {
             Some(version) => GithubApiClient::new()
-                .get_latest(crate::OBS_GIT_REPO)
+                .get_version(crate::OBS_GIT_REPO, &version)
                 .expect("Could not get git release!"),
             None => GithubApiClient::new()
                 .get_latest(crate::OBS_GIT_REPO)
@@ -50,8 +49,7 @@ impl Installable for Obs {
         // Filter OBS assets using search tags
         let git_assets = git_release
             .assets
-            .iter()
-            .cloned()
+            .into_iter()
             .filter(|asset| {
                 let name = asset.name.to_lowercase();
                 inc.iter().all(|i| name.contains(i))
@@ -119,27 +117,33 @@ impl Installable for Obs {
                     .collect::<Vec<GithubAsset>>();
 
                 let git_asset = git_assets.first().expect("Empty asset list!");
-                let file_path = exe_dir.join(&git_asset.name);
 
                 // Download asset
-                file::download(&git_asset.browser_download_url, &file_path, tx)?;
+                let file_path = exe_dir.join(&git_asset.name);
+                if !file_path.exists() {
+                    file::download(&git_asset.browser_download_url, &file_path, tx)?;
+                }
                 file::extract_zip(&file_path, &obs_dir)?;
                 fs::remove_file(file_path)?;
             }
 
             // OBS Profile & Scene Collection
             {
-                let zip_path = exe_dir.join("daw-obs-config-master.zip");
-                file::download(&crate::OBS_CONFIG.to_string(), &zip_path, tx)?;
-                file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
+                let zip_path = true_config.join("daw_obs_config_master.zip");
+                if !zip_path.exists() {
+                    file::download(&crate::OBS_CONFIG.to_string(), &zip_path, tx)?;
+                }
+                file::extract_zip(&zip_path, &true_config)?;
                 fs::remove_file(zip_path)?;
             }
 
             // OBS shortcut
             {
                 let scut_path = exe_dir.join("OBS.lnk");
-                let target_path = obs_dir.join("bin/64bit/obs64.exe");
-                scut::create_shortcut(scut_path, target_path)?;
+                if !scut_path.exists() {
+                    let target_path = obs_dir.join("bin/64bit/obs64.exe");
+                    scut::create_shortcut(scut_path, target_path)?;
+                }
             }
         }
 
@@ -163,8 +167,6 @@ impl Installable for Obs {
 
         // Open directory
         opener::open(exe_dir)?;
-
-        // TODO: Download pre-built OBS config
 
         Ok(())
     }
@@ -196,7 +198,7 @@ impl Installable for Ja2 {
         // Get latest OBS release assets
         let git_release = match &self.version {
             Some(version) => GithubApiClient::new()
-                .get_latest(crate::JACK2_GIT_REPO)
+                .get_version(crate::JACK2_GIT_REPO, &version)
                 .expect("Could not get git release!"),
             None => GithubApiClient::new()
                 .get_latest(crate::JACK2_GIT_REPO)
@@ -206,8 +208,7 @@ impl Installable for Ja2 {
         // Filter assets using search tags
         let git_assets = git_release
             .assets
-            .iter()
-            .cloned()
+            .into_iter()
             .filter(|asset| {
                 let name = asset.name.to_lowercase();
                 inc.iter().all(|i| name.contains(i)) && arch.iter().any(|a| name.contains(a))
@@ -239,18 +240,17 @@ impl Installable for Vmb {
     fn install(&self, tx: &mpsc::Sender<Event>) -> Result<()> {
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
-
         let zip_path = exe_dir.join("voicemeeter_banana_installer.zip");
-        let file_path = exe_dir.join("voicemeeterprosetup.exe");
 
         // Install & clean up
-        if !zip_path.exists() && !file_path.exists() {
+        if !zip_path.exists() {
             file::download(&crate::VMB_URL.to_string(), &zip_path, tx)?;
             file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
             fs::remove_file(&zip_path)?;
         }
 
         // Open directory
+        let file_path = exe_dir.join("voicemeeterprosetup.exe");
         file::run(&file_path)?;
         fs::remove_file(&file_path)?;
 
@@ -271,7 +271,7 @@ impl Installable for Khs {
         #[cfg(target_os = "macos")]
         let file_path = exe_dir.join("kilohearts_installer.dmg");
 
-        // Install & clean up
+        // Download and run
         if !file_path.exists() {
             file::download(&crate::KHS_URL.to_string(), &file_path, tx)?;
         }
@@ -299,7 +299,7 @@ impl Installable for Sbs {
         // Get latest OBS release assets
         let git_release = match &self.version {
             Some(version) => GithubApiClient::new()
-                .get_latest(crate::SONOBUS_GIT_REPO)
+                .get_version(crate::SONOBUS_GIT_REPO, version)
                 .expect("Could not get git release!"),
             None => GithubApiClient::new()
                 .get_latest(crate::SONOBUS_GIT_REPO)
@@ -309,8 +309,7 @@ impl Installable for Sbs {
         // Filter OBS assets using search tags
         let git_assets = git_release
             .assets
-            .iter()
-            .cloned()
+            .into_iter()
             .filter(|asset| {
                 let name = asset.name.to_lowercase();
                 inc.iter().all(|i| name.contains(i))
@@ -318,16 +317,12 @@ impl Installable for Sbs {
             .collect::<Vec<GithubAsset>>();
 
         let git_asset = git_assets.first().expect("Empty asset list!");
-
-        // Build paths
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
         let file_path = exe_dir.join(&git_asset.name);
 
-        // Download asset
+        // Download & install
         file::download(&git_asset.browser_download_url, &file_path, tx)?;
-
-        // Install & clean up
         file::run(&file_path)?;
         fs::remove_file(&file_path)?;
 

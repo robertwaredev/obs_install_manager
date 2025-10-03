@@ -106,6 +106,31 @@ impl GithubApiClient {
         }
     }
 
+    pub fn get_version(&self, repo: GithubRepo, version: &String) -> Result<GithubRelease> {
+        let mut url = PathBuf::new();
+        url.push(GIT_REPO_API);
+        url.push(repo.author);
+        url.push(repo.name);
+        url.push("releases");
+        url.push(version);
+        let url = url
+            .to_str()
+            .expect("GithubRepo struct is not valid unicode.");
+
+        let response = self.0.get(url).send()?;
+        match response.status() {
+            reqwest::StatusCode::OK => response
+                .json::<GithubRelease>()
+                .map_err(|e| eyre!("JSON decode error: {}", e)),
+            reqwest::StatusCode::NOT_FOUND => Err(eyre!("(404) Repository not found.")),
+            reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),
+            status => {
+                let error_body = response.text()?;
+                Err(eyre!("HTTP {}: {}", status, error_body))
+            }
+        }
+    }
+
     pub fn get_latest(&self, repo: GithubRepo) -> Result<GithubRelease> {
         let mut url = PathBuf::new();
         url.push(GIT_REPO_API);
