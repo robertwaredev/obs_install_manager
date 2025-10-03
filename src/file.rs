@@ -18,6 +18,7 @@ pub fn download<P: AsRef<Path>>(
     easy.url(url)?;
     easy.follow_location(true)?;
     easy.progress(true)?;
+    easy.useragent("obs-install-manager-dl/1.0")?;
 
     let mut file = fs::File::create(path)?;
     let mut transfer = easy.transfer();
