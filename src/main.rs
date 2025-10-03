@@ -20,12 +20,12 @@ pub const OBS_ASIO_GIT_REPO: GithubRepo = GithubRepo {
     name: "obs-asio",
 };
 
-pub const JACK2_GIT_REPO: GithubRepo = GithubRepo {
+pub const JA2_GIT_REPO: GithubRepo = GithubRepo {
     author: "jackaudio",
     name: "jack2-releases",
 };
 
-pub const SONOBUS_GIT_REPO: GithubRepo = GithubRepo {
+pub const SBS_GIT_REPO: GithubRepo = GithubRepo {
     author: "sonosaurus",
     name: "sonobus",
 };

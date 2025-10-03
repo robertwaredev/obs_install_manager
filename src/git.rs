@@ -1,6 +1,6 @@
 use color_eyre::{Result, eyre::eyre};
 use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::path::PathBuf;
 
 pub const GIT_REPO_API: &str = "https://api.github.com/repos";
@@ -90,20 +90,9 @@ impl GithubApiClient {
         url.push(repo.author);
         url.push(repo.name);
         url.push("releases");
-        let url = url.to_str().expect("GitRepo struct is not valid unicode.");
+        let url = url.to_str().expect("GithubRepo is not valid unicode.");
 
-        let response = self.0.get(url).send()?;
-        match response.status() {
-            reqwest::StatusCode::OK => response
-                .json::<Vec<GithubRelease>>()
-                .map_err(|e| eyre!("JSON decode error: {}", e)),
-            reqwest::StatusCode::NOT_FOUND => Err(eyre!("(404) Repository not found.")),
-            reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),
-            status => {
-                let error_body = response.text()?;
-                Err(eyre!("HTTP {}: {}", status, error_body))
-            }
-        }
+        self.parse_json::<Vec<GithubRelease>>(url)
     }
 
     pub fn get_version(&self, repo: GithubRepo, version: &String) -> Result<GithubRelease> {
@@ -113,22 +102,9 @@ impl GithubApiClient {
         url.push(repo.name);
         url.push("releases");
         url.push(version);
-        let url = url
-            .to_str()
-            .expect("GithubRepo struct is not valid unicode.");
+        let url = url.to_str().expect("GithubRepo is not valid unicode.");
 
-        let response = self.0.get(url).send()?;
-        match response.status() {
-            reqwest::StatusCode::OK => response
-                .json::<GithubRelease>()
-                .map_err(|e| eyre!("JSON decode error: {}", e)),
-            reqwest::StatusCode::NOT_FOUND => Err(eyre!("(404) Repository not found.")),
-            reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),
-            status => {
-                let error_body = response.text()?;
-                Err(eyre!("HTTP {}: {}", status, error_body))
-            }
-        }
+        self.parse_json::<GithubRelease>(url)
     }
 
     pub fn get_latest(&self, repo: GithubRepo) -> Result<GithubRelease> {
@@ -141,10 +117,14 @@ impl GithubApiClient {
             .to_str()
             .expect("GithubRepo struct is not valid unicode.");
 
+        self.parse_json::<GithubRelease>(url)
+    }
+
+    pub fn parse_json<T: DeserializeOwned>(&self, url: &str) -> Result<T> {
         let response = self.0.get(url).send()?;
         match response.status() {
             reqwest::StatusCode::OK => response
-                .json::<GithubRelease>()
+                .json::<T>()
                 .map_err(|e| eyre!("JSON decode error: {}", e)),
             reqwest::StatusCode::NOT_FOUND => Err(eyre!("(404) Repository not found.")),
             reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),

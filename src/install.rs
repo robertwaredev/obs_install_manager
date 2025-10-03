@@ -38,12 +38,8 @@ impl Installable for Obs {
 
         // Get latest OBS release assets
         let git_release = match &self.version {
-            Some(version) => GithubApiClient::new()
-                .get_version(crate::OBS_GIT_REPO, &version)
-                .expect("Could not get git release!"),
-            None => GithubApiClient::new()
-                .get_latest(crate::OBS_GIT_REPO)
-                .expect("Could not get latest git release!"),
+            Some(version) => GithubApiClient::new().get_version(crate::OBS_GIT_REPO, &version)?,
+            None => GithubApiClient::new().get_latest(crate::OBS_GIT_REPO)?,
         };
 
         // Filter OBS assets using search tags
@@ -97,23 +93,15 @@ impl Installable for Obs {
 
             // OBS ASIO Plugin
             {
-                // Build search tags
-                let inc = vec!["zip"];
-
                 // Get latest OBS release assets
-                let git_release = GithubApiClient::new()
-                    .get_latest(crate::OBS_ASIO_GIT_REPO)
-                    .expect("Could not get latest git release!");
+                let git_release = GithubApiClient::new().get_latest(crate::OBS_ASIO_GIT_REPO)?;
 
                 // Filter OBS assets using search tags
                 let git_assets = git_release
                     .assets
                     .iter()
                     .cloned()
-                    .filter(|asset| {
-                        let name = asset.name.to_lowercase();
-                        inc.iter().all(|i| name.contains(i))
-                    })
+                    .filter(|asset| asset.name.to_lowercase().contains("zip"))
                     .collect::<Vec<GithubAsset>>();
 
                 let git_asset = git_assets.first().expect("Empty asset list!");
@@ -195,14 +183,10 @@ impl Installable for Ja2 {
         #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
         let arch = vec!["universal"];
 
-        // Get latest OBS release assets
+        // Get latest release assets
         let git_release = match &self.version {
-            Some(version) => GithubApiClient::new()
-                .get_version(crate::JACK2_GIT_REPO, &version)
-                .expect("Could not get git release!"),
-            None => GithubApiClient::new()
-                .get_latest(crate::JACK2_GIT_REPO)
-                .expect("Could not get latest git release!"),
+            Some(version) => GithubApiClient::new().get_version(crate::JA2_GIT_REPO, &version)?,
+            None => GithubApiClient::new().get_latest(crate::JA2_GIT_REPO)?,
         };
 
         // Filter assets using search tags
@@ -295,15 +279,10 @@ impl Installable for Sbs {
         #[cfg(target_os = "macos")]
         let inc = vec!["mac", "dmg"];
 
-        // TODO: Prompt user for version instead of defaulting to latest.
         // Get latest OBS release assets
         let git_release = match &self.version {
-            Some(version) => GithubApiClient::new()
-                .get_version(crate::SONOBUS_GIT_REPO, version)
-                .expect("Could not get git release!"),
-            None => GithubApiClient::new()
-                .get_latest(crate::SONOBUS_GIT_REPO)
-                .expect("Could not get latest git release!"),
+            Some(version) => GithubApiClient::new().get_version(crate::SBS_GIT_REPO, version)?,
+            None => GithubApiClient::new().get_latest(crate::SBS_GIT_REPO)?,
         };
 
         // Filter OBS assets using search tags
