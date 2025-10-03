@@ -37,10 +37,8 @@ impl Installable for Obs {
         let arch = vec!["arm", "apple"];
 
         // Get latest OBS release assets
-        let git_release = match &self.version {
-            Some(version) => GithubApiClient::new().get_version(crate::OBS_GIT_REPO, &version)?,
-            None => GithubApiClient::new().get_latest(crate::OBS_GIT_REPO)?,
-        };
+        let git_release =
+            GithubApiClient::new().get_release(&crate::OBS_GIT_REPO, &self.version)?;
 
         // Filter OBS assets using search tags
         let git_assets = git_release
@@ -94,7 +92,8 @@ impl Installable for Obs {
             // OBS ASIO Plugin
             {
                 // Get latest OBS release assets
-                let git_release = GithubApiClient::new().get_latest(crate::OBS_ASIO_GIT_REPO)?;
+                let git_release =
+                    GithubApiClient::new().get_release(&crate::OBS_ASIO_GIT_REPO, &self.version)?;
 
                 // Filter OBS assets using search tags
                 let git_assets = git_release
@@ -184,10 +183,8 @@ impl Installable for Ja2 {
         let arch = vec!["universal"];
 
         // Get latest release assets
-        let git_release = match &self.version {
-            Some(version) => GithubApiClient::new().get_version(crate::JA2_GIT_REPO, &version)?,
-            None => GithubApiClient::new().get_latest(crate::JA2_GIT_REPO)?,
-        };
+        let git_release =
+            GithubApiClient::new().get_release(&crate::JA2_GIT_REPO, &self.version)?;
 
         // Filter assets using search tags
         let git_assets = git_release
@@ -280,10 +277,8 @@ impl Installable for Sbs {
         let inc = vec!["mac", "dmg"];
 
         // Get latest OBS release assets
-        let git_release = match &self.version {
-            Some(version) => GithubApiClient::new().get_version(crate::SBS_GIT_REPO, version)?,
-            None => GithubApiClient::new().get_latest(crate::SBS_GIT_REPO)?,
-        };
+        let git_release =
+            GithubApiClient::new().get_release(&crate::SBS_GIT_REPO, &self.version)?;
 
         // Filter OBS assets using search tags
         let git_assets = git_release

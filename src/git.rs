@@ -1,5 +1,5 @@
 use color_eyre::{Result, eyre::eyre};
-use reqwest::blocking::Client;
+use reqwest::{IntoUrl, blocking::Client};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::path::PathBuf;
 
@@ -10,7 +10,15 @@ pub struct GithubRepo {
     pub name: &'static str,
 }
 
-pub struct GithubApiClient(Client);
+impl GithubRepo {
+    pub fn url(&self) -> PathBuf {
+        PathBuf::new()
+            .join(GIT_REPO_API)
+            .join(self.author)
+            .join(self.name)
+            .join("releases")
+    }
+}
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct GithubRelease {
@@ -74,6 +82,8 @@ pub struct GithubAuthor {
     pub site_admin: bool,
 }
 
+pub struct GithubApiClient(Client);
+
 impl GithubApiClient {
     pub fn new() -> Self {
         Self(
@@ -84,43 +94,26 @@ impl GithubApiClient {
         )
     }
 
-    pub fn get_releases(&self, repo: GithubRepo) -> Result<Vec<GithubRelease>> {
-        let mut url = PathBuf::new();
-        url.push(GIT_REPO_API);
-        url.push(repo.author);
-        url.push(repo.name);
-        url.push("releases");
+    pub fn get_releases(&self, repo: &GithubRepo) -> Result<Vec<GithubRelease>> {
+        let url = repo.url();
         let url = url.to_str().expect("GithubRepo is not valid unicode.");
-
         self.parse_json::<Vec<GithubRelease>>(url)
     }
 
-    pub fn get_version(&self, repo: GithubRepo, version: &String) -> Result<GithubRelease> {
-        let mut url = PathBuf::new();
-        url.push(GIT_REPO_API);
-        url.push(repo.author);
-        url.push(repo.name);
-        url.push("releases");
-        url.push(version);
+    pub fn get_release(&self, repo: &GithubRepo, id: &Option<String>) -> Result<GithubRelease> {
+        let mut url = repo.url();
+
+        if let Some(id) = id {
+            url.push(id);
+        } else {
+            url.push("latest");
+        }
+
         let url = url.to_str().expect("GithubRepo is not valid unicode.");
-
         self.parse_json::<GithubRelease>(url)
     }
 
-    pub fn get_latest(&self, repo: GithubRepo) -> Result<GithubRelease> {
-        let mut url = PathBuf::new();
-        url.push(GIT_REPO_API);
-        url.push(repo.author);
-        url.push(repo.name);
-        url.push("releases/latest");
-        let url = url
-            .to_str()
-            .expect("GithubRepo struct is not valid unicode.");
-
-        self.parse_json::<GithubRelease>(url)
-    }
-
-    pub fn parse_json<T: DeserializeOwned>(&self, url: &str) -> Result<T> {
+    fn parse_json<T: DeserializeOwned>(&self, url: impl IntoUrl) -> Result<T> {
         let response = self.0.get(url).send()?;
         match response.status() {
             reqwest::StatusCode::OK => response
@@ -157,21 +150,24 @@ impl GithubAsset {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::OBS_GIT_REPO;
 
     #[test]
     fn test_git_api_client_get_releases() {
         println!(
             "{:?}",
-            GithubApiClient::new().get_releases(OBS_GIT_REPO).unwrap()
+            GithubApiClient::new()
+                .get_releases(&crate::OBS_GIT_REPO)
+                .unwrap()
         );
     }
 
     #[test]
-    fn test_git_api_client_get_latest() {
+    fn test_git_api_client_get_release() {
         println!(
             "{:?}",
-            GithubApiClient::new().get_latest(OBS_GIT_REPO).unwrap()
+            GithubApiClient::new()
+                .get_release(&crate::OBS_GIT_REPO, &None)
+                .unwrap()
         );
     }
 }
