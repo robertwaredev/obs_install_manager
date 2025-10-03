@@ -41,10 +41,10 @@ impl Installable for Obs {
         #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
         let arch = vec!["arm", "apple"];
 
-        // Get latest OBS release assets
+        // Get latest release assets
         let git_release = github_api_client.get_release(&crate::OBS_GIT_REPO, &self.version)?;
 
-        // Filter OBS assets using search tags
+        // Filter assets using search tags
         let git_assets = git_release
             .assets
             .into_iter()
@@ -61,24 +61,24 @@ impl Installable for Obs {
         // Build paths
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
-        let zip_path = exe_dir.join(&git_asset.name);
-        let zip_name = zip_path.file_stem().unwrap();
-        let extract_dir = exe_dir.join(&zip_name);
+        let file_path = exe_dir.join(&git_asset.name);
+        let file_name = file_path.file_stem().unwrap();
+        let extract_dir = exe_dir.join(&file_name);
 
-        if extract_dir.exists() || zip_path.exists() {
+        if extract_dir.exists() || file_path.exists() {
             opener::open(exe_dir)?;
             return Err(eyre!("OBS is already installed!"));
         }
 
         // Download asset
-        file::download(&git_asset.browser_download_url, &zip_path, tx)?;
+        file::download(&git_asset.browser_download_url, &file_path, tx)?;
 
         // Windows setup
         #[cfg(target_os = "windows")]
         {
             // Extract ZIP
-            file::extract_zip(&zip_path, &extract_dir)?;
-            fs::remove_file(&zip_path)?;
+            file::extract_zip(&file_path, &extract_dir)?;
+            fs::remove_file(&file_path)?;
 
             // Enable portable mode
             fs::File::create(extract_dir.join("portable_mode"))?;
@@ -121,12 +121,20 @@ impl Installable for Obs {
             // FIXME
             // OBS Profile & Scene Collection
             {
-                let zip_path = true_config.join("daw_obs_config_master.zip");
-                if !zip_path.exists() {
-                    file::download(&crate::OBS_CONFIG.to_string(), &zip_path, tx)?;
+                let zip_path = exe_dir.join("daw-obs-config-master.zip");
+                let zip_name = exe_dir.join("daw-obs-config-master");
+                let from = zip_name.join("obs-studio");
+                let to = true_config.join("obs-studio");
+
+                if !to.exists() {
+                    if !zip_path.exists() {
+                        file::download(&crate::OBS_CONFIG.to_string(), &zip_path, tx)?;
+                    }
+                    file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
+                    fs::rename(&from, &to)?;
+                    fs::remove_file(&zip_path)?;
+                    fs::remove_dir_all(&zip_name)?;
                 }
-                file::extract_zip(&zip_path, &true_config)?;
-                fs::remove_file(&zip_path)?;
             }
 
             // OBS shortcut
