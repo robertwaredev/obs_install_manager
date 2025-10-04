@@ -1,9 +1,10 @@
-use crate::install::{self, Installer};
-use crate::ui::{self, ActionItem};
+use crate::{
+    install::{Installer, Ja2, Khs, Obs, Sbs},
+    ui,
+};
 pub use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::prelude::*;
-use ratatui::{DefaultTerminal, widgets::*};
+use ratatui::{DefaultTerminal, prelude::*, widgets::*};
 use std::{sync::mpsc, thread};
 
 pub enum Event {
@@ -36,26 +37,23 @@ impl App {
         let (evtx, evrx) = mpsc::channel::<Event>();
 
         let items = vec![
-            ActionItem::new(
-                Installer::Obs(install::Obs::default()),
+            ui::ActionItem::new(
+                Installer::Obs(Obs::default()),
                 "Install OBS (Open Broadcast Software)".to_string(),
             ),
             // #[cfg(target_os = "windows")]
-            // ActionItem::new(
-            //     Installer::Vmb(install::Vmb),
+            // ui::ActionItem::new(
+            //     Installer::Vmb(Vmb),
             //     "Install Voicemeeter Banana".to_string(),
             // ),
-            ActionItem::new(
-                Installer::Ja2(install::Ja2::default()),
+            ui::ActionItem::new(
+                Installer::Ja2(Ja2::default()),
                 "Install Jack Audio Connection Kit".to_string(),
             ),
-            ActionItem::new(
-                Installer::Khs(install::Khs),
-                "Install Kilohearts Bundle".to_string(),
-            ),
+            ui::ActionItem::new(Installer::Khs(Khs), "Install Kilohearts Bundle".to_string()),
             #[cfg(any(target_os = "windows", target_os = "macos"))]
-            ActionItem::new(
-                Installer::Sbs(install::Sbs::default()),
+            ui::ActionItem::new(
+                Installer::Sbs(Sbs::default()),
                 "Install Sonobus".to_string(),
             ),
         ];
