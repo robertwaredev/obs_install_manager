@@ -1,11 +1,11 @@
-use crate::{
-    install::{Installer, Ja2, Khs, Obs, Sbs},
-    ui,
-};
+use crate::{install::Installer, ui};
 pub use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{DefaultTerminal, prelude::*, widgets::*};
-use std::{sync::mpsc, thread};
+use std::{
+    sync::mpsc::{self, Receiver, Sender},
+    thread,
+};
 
 pub enum Event {
     Key(KeyEvent),
@@ -25,8 +25,8 @@ pub fn send_progress_event(ratio: f64, tx: &mpsc::Sender<Event>) {
 }
 
 pub struct App {
-    pub evtx: mpsc::Sender<Event>,
-    pub evrx: mpsc::Receiver<Event>,
+    pub evtx: Sender<Event>,
+    pub evrx: Receiver<Event>,
     pub list: ui::StatefulList<'static>,
     pub pbar: ui::ProgressBar,
     pub exit: bool,
@@ -38,22 +38,25 @@ impl App {
 
         let items = vec![
             ui::ActionItem::new(
-                Installer::Obs(Obs::default()),
+                Installer::Obs(Default::default()),
                 "Install OBS (Open Broadcast Software)".to_string(),
             ),
             // #[cfg(target_os = "windows")]
             // ui::ActionItem::new(
-            //     Installer::Vmb(Vmb),
+            //     Installer::Vmb(Default::default()),
             //     "Install Voicemeeter Banana".to_string(),
             // ),
             ui::ActionItem::new(
-                Installer::Ja2(Ja2::default()),
+                Installer::Ja2(Default::default()),
                 "Install Jack Audio Connection Kit".to_string(),
             ),
-            ui::ActionItem::new(Installer::Khs(Khs), "Install Kilohearts Bundle".to_string()),
+            ui::ActionItem::new(
+                Installer::Khs(Default::default()),
+                "Install Kilohearts Bundle".to_string(),
+            ),
             #[cfg(any(target_os = "windows", target_os = "macos"))]
             ui::ActionItem::new(
-                Installer::Sbs(Sbs::default()),
+                Installer::Sbs(Default::default()),
                 "Install Sonobus".to_string(),
             ),
         ];
