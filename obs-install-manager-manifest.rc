@@ -1,2 +1,4 @@
 #define RT_MANIFEST 24
+
+1 ICON "obs-install-manager.ico"
 1 RT_MANIFEST "obs-install-manager.exe.manifest"
