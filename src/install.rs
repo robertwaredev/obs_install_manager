@@ -118,7 +118,6 @@ impl Installable for Obs {
                 fs::remove_file(&zip_path)?;
             }
 
-            // FIXME
             // OBS Profile & Scene Collection
             {
                 let zip_path = exe_dir.join("daw-obs-config-master.zip");
