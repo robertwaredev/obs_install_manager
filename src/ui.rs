@@ -99,8 +99,11 @@ pub struct ActionItem {
 }
 
 impl ActionItem {
-    pub fn new(kind: Installer, desc: String) -> Self {
-        Self { kind, desc }
+    pub fn new(kind: Installer, desc: &str) -> Self {
+        Self {
+            kind,
+            desc: String::from(desc),
+        }
     }
 
     pub fn description(&self) -> String {

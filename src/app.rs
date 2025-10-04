@@ -39,26 +39,22 @@ impl App {
         let items = vec![
             ui::ActionItem::new(
                 Installer::Obs(Default::default()),
-                "Install OBS (Open Broadcast Software)".to_string(),
+                "Install OBS (Open Broadcast Software)",
             ),
             // #[cfg(target_os = "windows")]
             // ui::ActionItem::new(
             //     Installer::Vmb(Default::default()),
-            //     "Install Voicemeeter Banana".to_string(),
+            //     "Install Voicemeeter Banana",
             // ),
             ui::ActionItem::new(
                 Installer::Ja2(Default::default()),
-                "Install Jack Audio Connection Kit".to_string(),
+                "Install Jack Audio Connection Kit",
             ),
             ui::ActionItem::new(
                 Installer::Khs(Default::default()),
-                "Install Kilohearts Bundle".to_string(),
+                "Install Kilohearts Bundle",
             ),
-            #[cfg(any(target_os = "windows", target_os = "macos"))]
-            ui::ActionItem::new(
-                Installer::Sbs(Default::default()),
-                "Install Sonobus".to_string(),
-            ),
+            ui::ActionItem::new(Installer::Sbs(Default::default()), "Install Sonobus"),
         ];
         let state = ListState::default().with_selected(Some(0));
         let header = Line::from(" OBS Install Manager ".bold());
@@ -132,9 +128,9 @@ impl App {
 
     fn select_accept(&mut self) -> Result<()> {
         if let Some(selected) = self.list.state.selected() {
-            let tx = self.evtx.clone();
+            let evtx = self.evtx.clone();
             let item = self.list.items[selected].clone();
-            thread::spawn(move || -> Result<()> { item.execute(tx).map_err(|e| eyre!("{e}")) });
+            thread::spawn(move || -> Result<()> { item.execute(evtx).map_err(|e| eyre!("{e}")) });
         }
         Ok(())
     }
