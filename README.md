@@ -15,3 +15,8 @@ This is a simple, cross-platform TUI app which handles downloading OBS and relat
 ## How to Use
 
 Download and put this into a new folder specifically for OBS before running. This can be located anywhere, and named anything, but my recommendation is creating a folder named "OBS" in your "Documents" folder so that you can find it easily.
+
+## Planned Features
+
+- OBS version selection as opposed to only the latest, greatest version.
+- Potentially offering multiple OBS configurations suited to different use cases.
