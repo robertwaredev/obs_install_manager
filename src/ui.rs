@@ -1,4 +1,3 @@
-use crate::app;
 use color_eyre::eyre::Result;
 use ratatui::prelude::*;
 use ratatui::{
@@ -8,7 +7,6 @@ use ratatui::{
     text::Line,
     widgets::*,
 };
-use std::sync::mpsc;
 
 pub const HIGHLIGHT_STYLE: Style = Style::new()
     .bg(tailwind::SLATE.c800)
@@ -42,13 +40,13 @@ impl ProgressBar {
 }
 
 #[derive(Clone)]
-pub struct FnItem {
-    pub op: fn(mpsc::Sender<app::Event>) -> Result<()>,
+pub struct FnItem<T> {
+    pub op: fn(T) -> Result<()>,
     pub desc: String,
 }
 
-impl FnItem {
-    pub fn new(op: fn(mpsc::Sender<app::Event>) -> Result<()>, desc: &str) -> Self {
+impl<T> FnItem<T> {
+    pub fn new(op: fn(T) -> Result<()>, desc: &str) -> Self {
         Self {
             op,
             desc: desc.into(),
@@ -61,14 +59,14 @@ impl FnItem {
 }
 
 #[derive(Default)]
-pub struct FnList<'a> {
-    pub items: Vec<FnItem>,
+pub struct FnList<'a, T> {
+    pub items: Vec<FnItem<T>>,
     pub state: ListState,
     pub header: Line<'a>,
     pub footer: Line<'a>,
 }
 
-impl<'a> FnList<'a> {
+impl<'a, T> FnList<'a, T> {
     pub fn width(&self, area: Rect) -> u16 {
         let width = self.items.iter().map(|s| s.desc().len()).max().unwrap_or(0);
         // +4 to account for padding and borders

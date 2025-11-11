@@ -24,7 +24,7 @@ pub fn send_progress_event(ratio: f64, tx: &mpsc::Sender<Event>) {
 pub struct App {
     pub evtx: mpsc::Sender<Event>,
     pub evrx: mpsc::Receiver<Event>,
-    pub list: ui::FnList<'static>,
+    pub list: ui::FnList<'static, mpsc::Sender<Event>>,
     pub pbar: ui::ProgressBar,
     pub exit: bool,
 }
