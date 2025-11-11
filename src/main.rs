@@ -49,7 +49,7 @@ pub const VMB_URL: &str = "https://download.vb-audio.com/Download_CABLE/Voicemee
 
 pub const REA_URL: &str = "https://www.reaper.fm/reaplugs/reaplugs236_x64-install.exe";
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub const KHS_URL: &str = "https://kilohearts.com/data/install/_/win";
 #[cfg(target_os = "macos")]
 pub const KHS_URL: &str = "https://kilohearts.com/data/install/_/mac";

@@ -307,7 +307,7 @@ impl Installable for Khs {
         let exe_path = std::env::current_exe()?;
         let exe_dir = exe_path.parent().unwrap();
 
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
         let file_path = exe_dir.join("kilohearts_installer.exe");
         #[cfg(target_os = "macos")]
         let file_path = exe_dir.join("kilohearts_installer.dmg");
