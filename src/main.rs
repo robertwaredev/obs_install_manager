@@ -32,17 +32,12 @@ pub const BLACKHOLE_REPO: GithubRepo = GithubRepo {
     name: "BlackHole",
 };
 
-pub const JA2_GIT_REPO: GithubRepo = GithubRepo {
-    author: "jackaudio",
-    name: "jack2-releases",
-};
-
 pub const SBS_GIT_REPO: GithubRepo = GithubRepo {
     author: "sonosaurus",
     name: "sonobus",
 };
 
-pub const OBS_CONFIG: &str =
+pub const OBS_CONFIG_URL: &str =
     "https://github.com/robertwaredev/daw-obs-config/archive/refs/heads/master.zip";
 
 pub const VMB_URL: &str = "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v2119.zip";

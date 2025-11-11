@@ -1,7 +1,4 @@
-use crate::{
-    app,
-    install::{Installable, Installer},
-};
+use crate::app;
 use color_eyre::eyre::Result;
 use ratatui::prelude::*;
 use ratatui::{
@@ -44,22 +41,36 @@ impl ProgressBar {
     }
 }
 
+#[derive(Clone)]
+pub struct FnItem {
+    pub op: fn(mpsc::Sender<app::Event>) -> Result<()>,
+    pub desc: String,
+}
+
+impl FnItem {
+    pub fn new(op: fn(mpsc::Sender<app::Event>) -> Result<()>, desc: &str) -> Self {
+        Self {
+            op,
+            desc: desc.into(),
+        }
+    }
+
+    pub fn desc(&self) -> String {
+        self.desc.clone()
+    }
+}
+
 #[derive(Default)]
-pub struct StatefulList<'a> {
-    pub items: Vec<ActionItem>,
+pub struct FnList<'a> {
+    pub items: Vec<FnItem>,
     pub state: ListState,
     pub header: Line<'a>,
     pub footer: Line<'a>,
 }
 
-impl<'a> StatefulList<'a> {
+impl<'a> FnList<'a> {
     pub fn width(&self, area: Rect) -> u16 {
-        let width = self
-            .items
-            .iter()
-            .map(|s| s.description().len())
-            .max()
-            .unwrap_or(0);
+        let width = self.items.iter().map(|s| s.desc().len()).max().unwrap_or(0);
         // +4 to account for padding and borders
         let width = width.max(self.header.width()).max(self.footer.width()) + 4;
         area.width.min(width as u16)
@@ -80,7 +91,7 @@ impl<'a> StatefulList<'a> {
             .border_set(border::ROUNDED)
             .padding(Padding::uniform(1));
 
-        let items: Vec<String> = self.items.iter().map(|i| i.description()).collect();
+        let items: Vec<String> = self.items.iter().map(|i| i.desc()).collect();
 
         let list = List::new(items)
             .block(block)
@@ -89,37 +100,5 @@ impl<'a> StatefulList<'a> {
             .highlight_spacing(HighlightSpacing::Always);
 
         StatefulWidget::render(list, area, buf, &mut self.state);
-    }
-}
-
-#[derive(Clone)]
-pub struct ActionItem {
-    pub kind: Installer,
-    pub desc: String,
-}
-
-impl ActionItem {
-    pub fn new(kind: Installer, desc: &str) -> Self {
-        Self {
-            kind,
-            desc: String::from(desc),
-        }
-    }
-
-    pub fn description(&self) -> String {
-        self.desc.clone()
-    }
-
-    pub fn execute(&self, tx: mpsc::Sender<app::Event>) -> Result<()> {
-        match &self.kind {
-            Installer::Obs(i) => i.install(&tx)?,
-            Installer::Vmb(i) => i.install(&tx)?,
-            Installer::Ja2(i) => i.install(&tx)?,
-            Installer::Khs(i) => i.install(&tx)?,
-            Installer::Rea(i) => i.install(&tx)?,
-            Installer::Eab(i) => i.install(&tx)?,
-            Installer::Sbs(i) => i.install(&tx)?,
-        }
-        Ok(())
     }
 }

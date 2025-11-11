@@ -254,7 +254,7 @@ jobs:
           path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
 
 
-# 🍏 UNIVERSAL MACOS MERGE (waits for all builds)
+# 🍏 UNIVERSAL MACOS MERGE
   merge-macos:
     name: Merge macOS Universal Binary
     runs-on: macos-latest

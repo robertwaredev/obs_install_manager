@@ -1,11 +1,8 @@
-use crate::{install::Installer, ui};
+use crate::{install, ui};
 pub use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{DefaultTerminal, prelude::*, widgets::*};
-use std::{
-    sync::mpsc::{self, Receiver, Sender},
-    thread,
-};
+use std::{sync::mpsc, thread};
 
 pub enum Event {
     Key(KeyEvent),
@@ -25,9 +22,9 @@ pub fn send_progress_event(ratio: f64, tx: &mpsc::Sender<Event>) {
 }
 
 pub struct App {
-    pub evtx: Sender<Event>,
-    pub evrx: Receiver<Event>,
-    pub list: ui::StatefulList<'static>,
+    pub evtx: mpsc::Sender<Event>,
+    pub evrx: mpsc::Receiver<Event>,
+    pub list: ui::FnList<'static>,
     pub pbar: ui::ProgressBar,
     pub exit: bool,
 }
@@ -37,35 +34,18 @@ impl App {
         let (evtx, evrx) = mpsc::channel::<Event>();
 
         let items = vec![
-            ui::ActionItem::new(
-                Installer::Obs(Default::default()),
-                "Install OBS (Open Broadcast Software)",
-            ),
-            // #[cfg(target_os = "windows")]
-            // ui::ActionItem::new(
-            //     Installer::Vmb(Default::default()),
-            //     "Install Voicemeeter Banana",
-            // ),
-            // ui::ActionItem::new(
-            //     Installer::Ja2(Default::default()),
-            //     "Install Jack Audio Connection Kit",
-            // ),
-            ui::ActionItem::new(
-                Installer::Khs(Default::default()),
-                "Install Kilohearts Bundle",
-            ),
+            ui::FnItem::new(install::obs, "Install OBS (Open Broadcast Software)"),
+            ui::FnItem::new(install::khs, "Install Kilohearts Bundle"),
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            ui::FnItem::new(install::rea, "Install ReaPlugs Bundle"),
             #[cfg(target_os = "windows")]
-            ui::ActionItem::new(
-                Installer::Rea(Default::default()),
-                "Install ReaPlugs Bundle",
-            ),
+            ui::FnItem::new(install::vmb, "Install Voicemeeter Banana"),
             #[cfg(target_os = "macos")]
-            ui::ActionItem::new(
-                Installer::Eab(Default::default()),
-                "Install BlackHole Driver",
-            ),
-            ui::ActionItem::new(Installer::Sbs(Default::default()), "Install Sonobus"),
+            ui::FnItem::new(install::eab, "Install BlackHole Driver"),
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
+            ui::FnItem::new(install::sbs, "Install Sonobus"),
         ];
+
         let state = ListState::default().with_selected(Some(0));
         let header = Line::from(" OBS Install Manager ".bold());
         let footer = Line::from(
@@ -74,7 +54,7 @@ impl App {
                 .bold(),
         );
 
-        let list = ui::StatefulList {
+        let list = ui::FnList {
             items,
             state,
             header,
@@ -140,7 +120,7 @@ impl App {
         if let Some(selected) = self.list.state.selected() {
             let evtx = self.evtx.clone();
             let item = self.list.items[selected].clone();
-            thread::spawn(move || -> Result<()> { item.execute(evtx).map_err(|e| eyre!("{e}")) });
+            thread::spawn(move || -> Result<()> { (item.op)(evtx).map_err(|e| eyre!("{e}")) });
         }
         Ok(())
     }
