@@ -25,6 +25,11 @@ pub const OBS_ATK_AUDIO_REPO: GithubRepo = GithubRepo {
     name: "PluginForObsRelease",
 };
 
+pub const BLACKHOLE_REPO: GithubRepo = GithubRepo {
+    author: "ExistentialAudio",
+    name: "BlackHole",
+};
+
 pub const JA2_GIT_REPO: GithubRepo = GithubRepo {
     author: "jackaudio",
     name: "jack2-releases",
@@ -46,6 +51,8 @@ pub const REA_URL: &str = "https://www.reaper.fm/reaplugs/reaplugs236_x64-instal
 pub const KHS_URL: &str = "https://kilohearts.com/data/install/_/win";
 #[cfg(target_os = "macos")]
 pub const KHS_URL: &str = "https://kilohearts.com/data/install/_/mac";
+
+pub const EAB_URL: &str = "https://existential.audio/blackhole/";
 
 fn main() -> Result<()> {
     color_eyre::install()?;

@@ -16,6 +16,7 @@ pub enum Installer {
     Ja2(Ja2),
     Khs(Khs),
     Rea(Rea),
+    Eab(Eab),
     Sbs(Sbs),
 }
 
@@ -116,8 +117,6 @@ impl Installable for Obs {
         // Unix main setup
         #[cfg(target_family = "unix")]
         {
-            // TODO: Run and rename installation according to version number
-
             // Create config true folder
             let true_config = exe_dir.join("obs-config");
             if !true_config.exists() {
@@ -127,8 +126,6 @@ impl Installable for Obs {
             // Symlink config folder
             let link_config = obs_dir.join("config");
             os::unix::fs::symlink(true_config, link_config)?;
-
-            // TODO: Create shortcut
         }
 
         // OBS ASIO Plugin
@@ -157,7 +154,7 @@ impl Installable for Obs {
             fs::remove_file(&zip_path)?;
         }
 
-        // TODO: OBS atkAudio Plugin
+        // OBS atkAudio Plugin
         {
             // Get latest release assets
             let git_release =
@@ -180,7 +177,6 @@ impl Installable for Obs {
             }
 
             let atk_dir = exe_dir.join("atk_audio");
-
             file::extract_zip(&zip_path, &atk_dir)?;
             fs::remove_file(&zip_path)?;
 
@@ -192,7 +188,7 @@ impl Installable for Obs {
             #[cfg(target_os = "linux")]
             let inc = "linux";
 
-            // TODO: Filter assets for correct platform and extract
+            // Filter assets for platform and extract
             for entry in fs::read_dir(&atk_dir)? {
                 let entry_path = entry?.path();
                 let entry_name = entry_path.to_str().unwrap().to_lowercase();
@@ -302,28 +298,6 @@ impl Installable for Vmb {
 }
 
 #[derive(Default, Clone)]
-pub struct Rea;
-
-impl Installable for Rea {
-    #[cfg(target_os = "windows")]
-    fn install(&self, tx: &Sender<Event>) -> Result<()> {
-        let exe_path = std::env::current_exe()?;
-        let exe_dir = exe_path.parent().unwrap();
-
-        let file_path = exe_dir.join("reaplugs_installer.exe");
-
-        // Download and run
-        if !file_path.exists() {
-            file::download(&crate::REA_URL.to_string(), &file_path, tx)?;
-        }
-        file::run(&file_path)?;
-        fs::remove_file(&file_path)?;
-
-        Ok(())
-    }
-}
-
-#[derive(Default, Clone)]
 pub struct Khs;
 
 impl Installable for Khs {
@@ -336,12 +310,42 @@ impl Installable for Khs {
         #[cfg(target_os = "macos")]
         let file_path = exe_dir.join("kilohearts_installer.dmg");
 
-        // Download and run
         if !file_path.exists() {
             file::download(&crate::KHS_URL.to_string(), &file_path, tx)?;
         }
         file::run(&file_path)?;
         fs::remove_file(&file_path)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Rea;
+
+impl Installable for Rea {
+    fn install(&self, tx: &Sender<Event>) -> Result<()> {
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+
+        let file_path = exe_dir.join("reaplugs_installer.exe");
+
+        if !file_path.exists() {
+            file::download(&crate::REA_URL.to_string(), &file_path, tx)?;
+        }
+        file::run(&file_path)?;
+        fs::remove_file(&file_path)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Eab;
+
+impl Installable for Eab {
+    fn install(&self, _: &Sender<Event>) -> Result<()> {
+        opener::open_browser(&crate::EAB_URL)?;
 
         Ok(())
     }

@@ -117,6 +117,7 @@ impl ActionItem {
             Installer::Ja2(i) => i.install(&tx)?,
             Installer::Khs(i) => i.install(&tx)?,
             Installer::Rea(i) => i.install(&tx)?,
+            Installer::Eab(i) => i.install(&tx)?,
             Installer::Sbs(i) => i.install(&tx)?,
         }
         Ok(())

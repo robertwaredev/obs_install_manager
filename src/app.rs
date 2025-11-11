@@ -59,6 +59,11 @@ impl App {
                 Installer::Rea(Default::default()),
                 "Install ReaPlugs Bundle",
             ),
+            #[cfg(target_os = "macos")]
+            ui::ActionItem::new(
+                Installer::Eab(Default::default()),
+                "Install BlackHole Driver",
+            ),
             ui::ActionItem::new(Installer::Sbs(Default::default()), "Install Sonobus"),
         ];
         let state = ListState::default().with_selected(Some(0));
