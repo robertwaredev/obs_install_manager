@@ -38,8 +38,8 @@ impl App {
             ui::FnItem::new(install::khs, "Install Kilohearts Bundle"),
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             ui::FnItem::new(install::rea, "Install ReaPlugs Bundle"),
-            #[cfg(target_os = "windows")]
-            ui::FnItem::new(install::vmb, "Install Voicemeeter Banana"),
+            // #[cfg(target_os = "windows")]
+            // ui::FnItem::new(install::vmb, "Install Voicemeeter Banana"),
             #[cfg(target_os = "macos")]
             ui::FnItem::new(install::eab, "Install BlackHole Driver"),
             #[cfg(any(target_os = "windows", target_os = "macos"))]
