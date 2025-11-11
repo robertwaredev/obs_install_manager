@@ -12,7 +12,7 @@ env:
   CARGO_NET_RETRY: 5
   CARGO_HTTP_TIMEOUT: 120
 
-# 🪟 WINDOWS
+
 jobs:
   build-windows:
     name: Windows Build
@@ -90,8 +90,6 @@ jobs:
             name: ${{ env.BIN_NAME }}_${{ matrix.artifact_name }}
             path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}.exe
 
-
-# 🍏 MACOS
   build-macos:
     name: macOS Build
     runs-on: macos-latest
@@ -174,8 +172,6 @@ jobs:
           name: ${{ env.BIN_NAME }}_${{ matrix.artifact_name }}
           path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
 
-
-# 🐧 LINUX
   build-linux:
     name: Linux Build
     runs-on: ubuntu-latest
@@ -253,8 +249,6 @@ jobs:
           name: ${{ env.BIN_NAME }}_${{ matrix.artifact_name }}
           path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
 
-
-# 🍏 UNIVERSAL MACOS MERGE
   merge-macos:
     name: Merge macOS Universal Binary
     runs-on: macos-latest
@@ -270,14 +264,14 @@ jobs:
         run: |
           mkdir -p target/universal
           version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
-          unzip artifacts/macos-x86_64/*.zip -d artifacts/macos-x86_64/
-          unzip artifacts/macos-arm64/*.zip -d artifacts/macos-arm64/
+          unzip artifacts/macos_x86_64/*.zip -d artifacts/macos_x86_64/
+          unzip artifacts/macos_arm64/*.zip -d artifacts/macos_arm64/
           lipo -create \
-            artifacts/macos-x86_64/${BIN_NAME} \
-            artifacts/macos-arm64/${BIN_NAME} \
+            artifacts/macos_x86_64/${BIN_NAME} \
+            artifacts/macos_arm64/${BIN_NAME} \
             -output target/universal/${BIN_NAME}
           cd target/universal
-          zip "${BIN_NAME}-v${version}-macos-universal.zip" "${BIN_NAME}"
+          zip "${BIN_NAME}_v${version}_macos_universal.zip" "${BIN_NAME}"
 
       - name: Diagnostics
         run: |
