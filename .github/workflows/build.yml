@@ -1,4 +1,4 @@
-name: Rust Multiplatform Build (Stable & macOS Universal)
+name: Rust Multiplatform Build (Parallel Builds + macOS Universal)
 
 on:
   push:
@@ -12,38 +12,22 @@ env:
   CARGO_NET_RETRY: 5
   CARGO_HTTP_TIMEOUT: 120
 
+# 🪟 WINDOWS
 jobs:
-  build:
-    name: Build ${{ matrix.os }} ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    name: Windows Build
+    runs-on: windows-latest
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: linux-x86_64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
+          - target: x86_64-pc-windows-msvc
             artifact_name: windows-x86_64
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact_name: macos-x86_64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact_name: macos-arm64
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 🐧 Linux dependencies
-      - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
-
-      # 🪟 Windows cache setup
-      - name: Setup Cargo cache (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Setup Cargo cache
         uses: actions/cache@v4
         with:
           path: |
@@ -54,20 +38,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      # 🍎 macOS/Linux cache setup
-      - name: Setup Cargo cache (macOS/Linux)
-        if: matrix.os != 'windows-latest'
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      # 🦀 Rust toolchain setup (with retries & progress)
       - name: Cache Rust toolchain
         uses: actions/cache@v4
         with:
@@ -92,72 +62,215 @@ jobs:
           rustup default stable
           rustup target list --installed
 
-      # 🍎 Ensure ARM64 target for macOS
-      - name: Ensure macOS ARM target
-        if: startsWith(matrix.target, 'aarch64-apple-darwin')
-        run: rustup target add aarch64-apple-darwin
-
-      # ⬇️ Prefetch crates
       - name: Prefetch dependencies
         run: cargo fetch --locked
 
-      # 🏗️ Build
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
 
-      # 🧪 Test (skip for macOS ARM64)
       - name: Run tests
-        if: matrix.target != 'aarch64-apple-darwin'
-        run: cargo test --target ${{ matrix.target }} --verbose
+        run: cargo test --target ${{ matrix.target }} -- --verbose
 
-      # 🧰 Diagnostic info
       - name: Diagnostics
         shell: bash
         run: |
           echo "🧩 SYSTEM INFO ----------------------------"
           echo "Runner OS: ${{ runner.os }}"
           echo "Target: ${{ matrix.target }}"
-          echo "Rust toolchain:"
           rustc --version
           cargo --version
           rustup show
-          echo ""
-          echo "📂 Directory structure:"
-          ls -R target/${{ matrix.target }}/release || dir target\\${{ matrix.target }}\\release
-          echo ""
           echo "✅ Checking for built binary:"
-          if [[ -f target/${{ matrix.target }}/release/${BIN_NAME}* ]]; then
-            echo "Binary found!"
-          else
-            echo "⚠️ Binary not found!"
-          fi
+          ls -R target/${{ matrix.target }}/release || dir target\\${{ matrix.target }}\\release
           echo "-------------------------------------------"
 
-      # 📦 Zip the binary
       - name: Zip binary
         shell: bash
         run: |
           mkdir -p dist
           version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
           cd target/${{ matrix.target }}/release
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}.exe"
-          else
-            zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}"
-          fi
+          zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}.exe"
 
-      # ☁️ Upload artifact
-      - name: Upload zipped artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/*.zip
 
-  # 🍏 Merge macOS Universal Binary
+# 🍏 MACOS
+  build-macos:
+    name: macOS Build
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            artifact_name: macos-x86_64
+          - target: aarch64-apple-darwin
+            artifact_name: macos-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Rust toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.rustup/toolchains
+            ~/.rustup/update-hashes
+          key: rustup-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Rust toolchain (resilient)
+        shell: bash
+        run: |
+          echo "Installing Rust toolchain for target ${{ matrix.target }}..."
+          for i in 1 2 3; do
+            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal --component rustfmt clippy -- --verbose; then
+              echo "✅ Rust toolchain installed successfully."
+              break
+            else
+              echo "⚠️ rustup failed (attempt $i), retrying in 15s..."
+              sleep 15
+            fi
+          done
+          rustup default stable
+          rustup target list --installed
+
+      - name: Prefetch dependencies
+        run: cargo fetch --locked
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Diagnostics
+        run: |
+          echo "🧩 SYSTEM INFO ----------------------------"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Target: ${{ matrix.target }}"
+          rustc --version
+          cargo --version
+          rustup show
+          echo "✅ Checking for built binary:"
+          ls -R target/${{ matrix.target }}/release
+          echo "-------------------------------------------"
+
+      - name: Zip binary
+        run: |
+          mkdir -p dist
+          version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
+          cd target/${{ matrix.target }}/release
+          zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*.zip
+
+# 🐧 LINUX
+  build-linux:
+    name: Linux Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            artifact_name: linux-x86_64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Setup Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Rust toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.rustup/toolchains
+            ~/.rustup/update-hashes
+          key: rustup-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Rust toolchain (resilient)
+        run: |
+          echo "Installing Rust toolchain for target ${{ matrix.target }}..."
+          for i in 1 2 3; do
+            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal --component rustfmt clippy -- --verbose; then
+              echo "✅ Rust toolchain installed successfully."
+              break
+            else
+              echo "⚠️ rustup failed (attempt $i), retrying in 15s..."
+              sleep 15
+            fi
+          done
+          rustup default stable
+          rustup target list --installed
+
+      - name: Prefetch dependencies
+        run: cargo fetch --locked
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Run tests
+        run: cargo test --target ${{ matrix.target }} -- --verbose
+
+      - name: Diagnostics
+        run: |
+          echo "🧩 SYSTEM INFO ----------------------------"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Target: ${{ matrix.target }}"
+          rustc --version
+          cargo --version
+          rustup show
+          echo "✅ Checking for built binary:"
+          ls -R target/${{ matrix.target }}/release
+          echo "-------------------------------------------"
+
+      - name: Zip binary
+        run: |
+          mkdir -p dist
+          version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
+          cd target/${{ matrix.target }}/release
+          zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*.zip
+
+# 🍏 UNIVERSAL MACOS MERGE (waits for all builds)
   merge-macos:
     name: Merge macOS Universal Binary
     runs-on: macos-latest
-    needs: build
+    needs: [build-macos]
+
     steps:
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
@@ -177,7 +290,6 @@ jobs:
           cd target/universal
           zip "${BIN_NAME}-v${version}-macos-universal.zip" "${BIN_NAME}"
 
-      # 🧰 Diagnostic info for Universal Binary
       - name: Diagnostics
         run: |
           echo "🧩 macOS Universal Binary Diagnostics"
