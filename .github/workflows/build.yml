@@ -240,10 +240,10 @@ jobs:
           echo "-------------------------------------------"
 
       - name: Upload binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.artifact_name }}
-        path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
 
 
 # 🍏 UNIVERSAL MACOS MERGE (waits for all builds)
