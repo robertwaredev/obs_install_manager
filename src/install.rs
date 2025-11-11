@@ -35,7 +35,7 @@ impl Installable for Obs {
         #[cfg(target_os = "windows")]
         let (inc, exc) = (vec!["windows", "zip"], vec!["pdb"]);
         #[cfg(target_os = "macos")]
-        let (inc, exc) = (vec!["macos", "dmg"], vec![]);
+        let (inc, exc) = (vec!["macos", "dmg"], vec![""]);
         #[cfg(target_os = "linux")]
         let (inc, exc) = (vec!["ubuntu", "deb"], vec!["ddeb"]);
 

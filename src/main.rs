@@ -7,8 +7,10 @@ pub mod app;
 pub mod file;
 pub mod git;
 pub mod install;
-pub mod scut;
 pub mod ui;
+
+#[cfg(windows)]
+pub mod scut;
 
 pub const OBS_GIT_REPO: GithubRepo = GithubRepo {
     author: "obsproject",
