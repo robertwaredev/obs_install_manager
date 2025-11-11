@@ -260,29 +260,35 @@ jobs:
         with:
           path: ./artifacts
 
-      - name: Create Universal Binary
+      - name: Merge Universal Binary
+        shell: bash
         run: |
+          set -e
           mkdir -p target/universal
           version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
-          unzip artifacts/macos_x86_64/*.zip -d artifacts/macos_x86_64/
-          unzip artifacts/macos_arm64/*.zip -d artifacts/macos_arm64/
-          lipo -create \
-            artifacts/macos_x86_64/${BIN_NAME} \
-            artifacts/macos_arm64/${BIN_NAME} \
-            -output target/universal/${BIN_NAME}
-          cd target/universal
-          zip "${BIN_NAME}_v${version}_macos_universal.zip" "${BIN_NAME}"
 
-      - name: Diagnostics
-        run: |
-          echo "🧩 macOS Universal Binary Diagnostics"
-          rustc --version
-          file target/universal/${BIN_NAME}
-          ls -lh target/universal/
-          echo "✅ Universal binary creation complete."
+          echo "🧩 Searching for macOS binaries..."
+          x86_bin=$(find artifacts/obs_install_manager_macos_x86_64 -type f -name "${BIN_NAME}-v${version}-macos_x86_64*" | head -n1)
+          arm_bin=$(find artifacts/obs_install_manager_macos_arm64 -type f -name "${BIN_NAME}-v${version}-macos_arm64*" | head -n1)
+
+          echo "🧩 Found x86_64 binary: $x86_bin"
+          echo "🧩 Found arm64 binary: $arm_bin"
+
+          if [[ -z "$x86_bin" || -z "$arm_bin" ]]; then
+            echo "❌ Missing one or both architecture binaries for universal merge"
+            exit 1
+          fi
+
+          # Merge both into one universal binary
+          universal_bin="target/universal/${BIN_NAME}-v${version}-macos_universal"
+          lipo -create "$x86_bin" "$arm_bin" -output "$universal_bin"
+
+          echo "✅ Universal binary created at: $universal_bin"
+          file "$universal_bin"
+          ls -lh target/universal
 
       - name: Upload Universal Binary
         uses: actions/upload-artifact@v4
         with:
-          name: macos-universal
-          path: target/universal/*.zip
+          name: obs_install_manager_macos_universal
+          path: target/universal/${{ env.BIN_NAME }}-v*-macos_universal
