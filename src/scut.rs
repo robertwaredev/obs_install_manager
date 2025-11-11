@@ -1,6 +1,8 @@
 use color_eyre::{Result, eyre::eyre};
-use mslnk::ShellLink;
 use std::path::Path;
+
+#[cfg(windows)]
+use mslnk::ShellLink;
 
 #[cfg(target_os = "windows")]
 pub fn create_shortcut<P: AsRef<Path>>(shortcut_path: P, target_path: P) -> Result<()> {

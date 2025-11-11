@@ -145,6 +145,14 @@ jobs:
       - name: Prefetch dependencies
         run: cargo fetch --locked
 
+      - name: Install OpenSSL
+        run: brew install openssl
+
+      - name: Set OpenSSL environment variables
+        run: |
+          echo "OPENSSL_DIR=$(brew --prefix openssl)" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig" >> $GITHUB_ENV
+
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
 
