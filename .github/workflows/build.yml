@@ -1,0 +1,112 @@
+name: Rust Multiplatform Build (with macOS Universal)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # allows manual runs
+
+env:
+  BIN_NAME: obs_install_manager
+
+jobs:
+  build:
+    name: Build and Test on ${{ matrix.os }} ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # 🐧 Linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: linux-x86_64
+          # 🪟 Windows
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: windows-x86_64
+          # 🍎 macOS Intel
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: macos-x86_64
+          # 🍎 macOS Apple Silicon
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: macos-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Build (release)
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Run tests
+        run: cargo test --target ${{ matrix.target }} --verbose
+
+      - name: Zip binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
+          cd target/${{ matrix.target }}/release
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}.exe"
+          else
+            zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}"
+          fi
+
+      - name: Upload zipped artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*.zip
+
+  merge-macos:
+    name: Merge macOS Universal Binary
+    runs-on: macos-latest
+    needs: build
+    steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Universal Binary
+        run: |
+          mkdir -p target/universal
+          # Extract version dynamically from Cargo.toml
+          version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
+          unzip artifacts/macos-x86_64/*.zip -d artifacts/macos-x86_64/
+          unzip artifacts/macos-arm64/*.zip -d artifacts/macos-arm64/
+          lipo -create \
+            artifacts/macos-x86_64/${BIN_NAME} \
+            artifacts/macos-arm64/${BIN_NAME} \
+            -output target/universal/${BIN_NAME}
+
+          cd target/universal
+          zip "${BIN_NAME}-v${version}-macos-universal.zip" "${BIN_NAME}"
+
+      - name: Upload Universal Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: target/universal/*.zip
