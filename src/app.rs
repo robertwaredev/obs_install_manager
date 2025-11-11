@@ -89,13 +89,9 @@ impl App {
 
         while !self.exit {
             match self.evrx.recv()? {
-                Event::Key(key_event) => {
-                    if self.pbar.ratio == 0.0 {
-                        self.handle_key_event(key_event)?
-                    }
-                }
-                Event::Progress(ratio) => self.pbar.set_ratio(ratio),
-                Event::Error(report) => return Err(report),
+                Event::Key(k) => self.handle_key_event(k),
+                Event::Progress(p) => self.pbar.set_ratio(p),
+                Event::Error(e) => return Err(e),
             }
 
             term.draw(|frame| self.draw(frame))?;
@@ -108,7 +104,11 @@ impl App {
         frame.render_widget(self, frame.area());
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
+    fn handle_key_event(&mut self, key_event: KeyEvent) {
+        if self.pbar.ratio != 0.0 {
+            return;
+        }
+
         if KeyEventKind::Press == key_event.kind {
             match key_event.code {
                 KeyCode::Up => self.list.state.select_previous(),
@@ -118,7 +118,6 @@ impl App {
                 _ => (),
             }
         };
-        Ok(())
     }
 
     fn select_accept(&mut self) {

@@ -1,5 +1,5 @@
 use crate::app::{Event, send_progress_event};
-use color_eyre::Result;
+use color_eyre::{Result, eyre::WrapErr, eyre::eyre};
 use curl::easy::{Easy, WriteError};
 use std::{
     fs,
@@ -63,4 +63,69 @@ pub fn extract_zip<P: AsRef<Path>>(file_path: P, extract_dir: P) -> Result<()> {
 
 pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
     Ok(Command::new(path.as_ref().as_os_str()).spawn()?.wait()?)
+}
+
+pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
+    // Mount the DMG
+    let output = Command::new("hdiutil")
+        .args(["attach", dmg_path, "-nobrowse", "-quiet", "-plist"])
+        .output()
+        .context("Failed to mount DMG")?;
+
+    if !output.status.success() {
+        return Err(eyre!("hdiutil attach failed"));
+    }
+
+    let plist_output = String::from_utf8_lossy(&output.stdout);
+
+    // Parse mount point from plist (more reliable)
+    // You might want to use a plist parser crate like `plist`
+    let mount_point = extract_mount_point_from_plist(&plist_output)?;
+
+    // Ensure cleanup happens even if copy fails
+    let result = (|| -> Result<()> {
+        let app_source = format!("{}/{}", mount_point, app_name);
+        let app_dest = format!("/Applications/{}", app_name);
+
+        // Remove existing app if present
+        let _ = Command::new("rm").args(["-rf", &app_dest]).status();
+
+        // Copy the app
+        let status = Command::new("cp")
+            .args(["-R", &app_source, &app_dest])
+            .status()
+            .context("Failed to copy app")?;
+
+        if !status.success() {
+            return Err(eyre!("cp command failed"));
+        }
+
+        Ok(())
+    })();
+
+    // Always unmount, even if copy failed
+    Command::new("hdiutil")
+        .args(["detach", &mount_point, "-force", "-quiet"])
+        .status()
+        .context("Failed to unmount DMG")?;
+
+    result
+}
+
+fn extract_mount_point_from_plist(plist: &str) -> Result<String> {
+    // Simple parsing - in production use the `plist` crate
+    for line in plist.lines() {
+        if line.contains("<key>mount-point</key>") {
+            // Next line should have the value
+            continue;
+        }
+        if line.contains("<string>/Volumes/") {
+            return Ok(line
+                .trim()
+                .trim_start_matches("<string>")
+                .trim_end_matches("</string>")
+                .to_string());
+        }
+    }
+    Err(eyre!("Could not find mount point in plist"))
 }

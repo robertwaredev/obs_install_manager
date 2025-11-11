@@ -97,10 +97,13 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     // Unix main setup
     #[cfg(target_family = "unix")]
     {
+        // Install DMG
+        file::install_dmg(file_path, file_name);
+
         // Create config true folder
         let true_config = exe_dir.join("obs-config");
         if !true_config.exists() {
-            fs::create_dir(&true_config)?;
+            os::unix::fs::create_dir(&true_config)?;
         }
 
         // Symlink config folder
