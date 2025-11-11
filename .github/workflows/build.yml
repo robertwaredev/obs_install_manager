@@ -87,7 +87,7 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-            name: ${{ matrix.artifact_name }}
+            name: ${{ env.BIN_NAME }}-${{ matrix.artifact_name }}
             path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}.exe
 
 
@@ -163,7 +163,7 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: ${{ env.BIN_NAME }}-${{ matrix.artifact_name }}
           path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
 
 
@@ -242,7 +242,7 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: ${{ env.BIN_NAME }}-${{ matrix.artifact_name }}
           path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
 
 
