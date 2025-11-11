@@ -46,13 +46,18 @@ impl App {
             //     Installer::Vmb(Default::default()),
             //     "Install Voicemeeter Banana",
             // ),
-            ui::ActionItem::new(
-                Installer::Ja2(Default::default()),
-                "Install Jack Audio Connection Kit",
-            ),
+            // ui::ActionItem::new(
+            //     Installer::Ja2(Default::default()),
+            //     "Install Jack Audio Connection Kit",
+            // ),
             ui::ActionItem::new(
                 Installer::Khs(Default::default()),
                 "Install Kilohearts Bundle",
+            ),
+            #[cfg(target_os = "windows")]
+            ui::ActionItem::new(
+                Installer::Rea(Default::default()),
+                "Install ReaPlugs Bundle",
             ),
             ui::ActionItem::new(Installer::Sbs(Default::default()), "Install Sonobus"),
         ];

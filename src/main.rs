@@ -20,6 +20,11 @@ pub const OBS_ASIO_GIT_REPO: GithubRepo = GithubRepo {
     name: "obs-asio",
 };
 
+pub const OBS_ATK_AUDIO_REPO: GithubRepo = GithubRepo {
+    author: "atkAudio",
+    name: "PluginForObsRelease",
+};
+
 pub const JA2_GIT_REPO: GithubRepo = GithubRepo {
     author: "jackaudio",
     name: "jack2-releases",
@@ -34,6 +39,8 @@ pub const OBS_CONFIG: &str =
     "https://github.com/robertwaredev/daw-obs-config/archive/refs/heads/master.zip";
 
 pub const VMB_URL: &str = "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v2119.zip";
+
+pub const REA_URL: &str = "https://www.reaper.fm/reaplugs/reaplugs236_x64-install.exe";
 
 #[cfg(target_os = "windows")]
 pub const KHS_URL: &str = "https://kilohearts.com/data/install/_/win";

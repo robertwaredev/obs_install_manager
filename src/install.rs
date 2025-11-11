@@ -15,6 +15,7 @@ pub enum Installer {
     Vmb(Vmb),
     Ja2(Ja2),
     Khs(Khs),
+    Rea(Rea),
     Sbs(Sbs),
 }
 
@@ -73,7 +74,7 @@ impl Installable for Obs {
         // Download asset
         file::download(&git_asset.browser_download_url, &file_path, tx)?;
 
-        // Windows setup
+        // Windows main setup
         #[cfg(target_os = "windows")]
         {
             // Extract ZIP
@@ -93,31 +94,6 @@ impl Installable for Obs {
             let link_config = extract_dir.join("config");
             os::windows::fs::symlink_dir(&true_config, &link_config)?;
 
-            // OBS ASIO Plugin
-            {
-                // Get latest release assets
-                let git_release =
-                    github_api_client.get_release(&crate::OBS_ASIO_GIT_REPO, &self.version)?;
-
-                // Filter assets using search tags
-                let git_assets = git_release
-                    .assets
-                    .iter()
-                    .cloned()
-                    .filter(|asset| asset.name.to_lowercase().contains("zip"))
-                    .collect::<Vec<GithubAsset>>();
-
-                let git_asset = git_assets.first().ok_or_eyre("GithubAsset vec is empty!")?;
-
-                // Download asset
-                let zip_path = exe_dir.join(&git_asset.name);
-                if !zip_path.exists() {
-                    file::download(&git_asset.browser_download_url, &zip_path, tx)?;
-                }
-                file::extract_zip(&zip_path, &extract_dir)?;
-                fs::remove_file(&zip_path)?;
-            }
-
             // OBS Profile & Scene Collection
             {
                 let zip_path = exe_dir.join("daw-obs-config-master.zip");
@@ -135,18 +111,9 @@ impl Installable for Obs {
                     fs::remove_dir_all(&zip_name)?;
                 }
             }
-
-            // OBS shortcut
-            {
-                let scut_path = exe_dir.join("OBS.lnk");
-                if !scut_path.exists() {
-                    let target_path = extract_dir.join("bin/64bit/obs64.exe");
-                    scut::create_shortcut(scut_path, target_path)?;
-                }
-            }
         }
 
-        // Unix setup
+        // Unix main setup
         #[cfg(target_family = "unix")]
         {
             // TODO: Run and rename installation according to version number
@@ -164,7 +131,90 @@ impl Installable for Obs {
             // TODO: Create shortcut
         }
 
-        // Open directory
+        // OBS ASIO Plugin
+        #[cfg(target_os = "windows")]
+        {
+            // Get latest release assets
+            let git_release =
+                github_api_client.get_release(&crate::OBS_ASIO_GIT_REPO, &self.version)?;
+
+            // Filter assets using search tags
+            let git_assets = git_release
+                .assets
+                .iter()
+                .cloned()
+                .filter(|asset| asset.name.to_lowercase().contains("zip"))
+                .collect::<Vec<GithubAsset>>();
+
+            let git_asset = git_assets.first().ok_or_eyre("GithubAsset vec is empty!")?;
+
+            // Download asset
+            let zip_path = exe_dir.join(&git_asset.name);
+            if !zip_path.exists() {
+                file::download(&git_asset.browser_download_url, &zip_path, tx)?;
+            }
+            file::extract_zip(&zip_path, &extract_dir)?;
+            fs::remove_file(&zip_path)?;
+        }
+
+        // TODO: OBS atkAudio Plugin
+        {
+            // Get latest release assets
+            let git_release =
+                github_api_client.get_release(&crate::OBS_ATK_AUDIO_REPO, &self.version)?;
+
+            // Filter assets using search tags
+            let git_assets = git_release
+                .assets
+                .iter()
+                .cloned()
+                .filter(|asset| asset.name.to_lowercase().contains("zip"))
+                .collect::<Vec<GithubAsset>>();
+
+            let git_asset = git_assets.first().ok_or_eyre("GithubAsset vec is empty!")?;
+
+            // Download asset
+            let zip_path = exe_dir.join(&git_asset.name);
+            if !zip_path.exists() {
+                file::download(&git_asset.browser_download_url, &zip_path, tx)?;
+            }
+
+            let atk_dir = exe_dir.join("atk_audio");
+
+            file::extract_zip(&zip_path, &atk_dir)?;
+            fs::remove_file(&zip_path)?;
+
+            // Build search tags per operating system
+            #[cfg(target_os = "windows")]
+            let inc = "windows";
+            #[cfg(target_os = "macos")]
+            let inc = "macos";
+            #[cfg(target_os = "linux")]
+            let inc = "linux";
+
+            // TODO: Filter assets for correct platform and extract
+            for entry in fs::read_dir(&atk_dir)? {
+                let entry_path = entry?.path();
+                let entry_name = entry_path.to_str().unwrap().to_lowercase();
+                if entry_name.contains(inc) && entry_name.contains("zip") {
+                    file::extract_zip(&entry_path, &extract_dir)?;
+                }
+            }
+
+            fs::remove_dir_all(&atk_dir)?;
+        }
+
+        // Create OBS shortcut
+        #[cfg(target_os = "windows")]
+        {
+            let scut_path = exe_dir.join("OBS.lnk");
+            if !scut_path.exists() {
+                let target_path = extract_dir.join("bin/64bit/obs64.exe");
+                scut::create_shortcut(scut_path, target_path)?;
+            }
+        }
+
+        // Open install directory
         opener::open(exe_dir)?;
 
         Ok(())
@@ -244,6 +294,28 @@ impl Installable for Vmb {
 
         // Open directory
         let file_path = exe_dir.join("voicemeeterprosetup.exe");
+        file::run(&file_path)?;
+        fs::remove_file(&file_path)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Rea;
+
+impl Installable for Rea {
+    #[cfg(target_os = "windows")]
+    fn install(&self, tx: &Sender<Event>) -> Result<()> {
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent().unwrap();
+
+        let file_path = exe_dir.join("reaplugs_installer.exe");
+
+        // Download and run
+        if !file_path.exists() {
+            file::download(&crate::REA_URL.to_string(), &file_path, tx)?;
+        }
         file::run(&file_path)?;
         fs::remove_file(&file_path)?;
 
