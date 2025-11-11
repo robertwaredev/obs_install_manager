@@ -238,7 +238,7 @@ jobs:
             exit 1
           fi
 
-          universal_bin="target/universal/${BIN_NAME}-v${version}-macos_universal"
+          universal_bin="target/universal/${BIN_NAME}_v${version}_macos_universal"
           lipo -create "$x86_bin" "$arm_bin" -output "$universal_bin"
 
           echo "✅ Universal binary created at: $universal_bin"

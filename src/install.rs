@@ -13,11 +13,11 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
 
     // Build search tags per operating system
     #[cfg(target_os = "windows")]
-    let (inc, exc) = (vec!["windows", "zip"], vec!["pdb"]);
+    let (inc, exc) = (vec!["windows", "zip"], "pdb");
     #[cfg(target_os = "macos")]
-    let (inc, exc) = (vec!["macos", "dmg"], vec![""]);
+    let (inc, exc) = (vec!["macos", "dmg"], "tar");
     #[cfg(target_os = "linux")]
-    let (inc, exc) = (vec!["ubuntu", "deb"], vec!["ddeb"]);
+    let (inc, exc) = (vec!["ubuntu", "deb"], "ddeb");
 
     // Build search tags per cpu architecture
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -35,7 +35,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         .filter(|asset| {
             let name = asset.name.to_lowercase();
             inc.iter().all(|i| name.contains(i))
-                && !exc.iter().any(|e| name.contains(e))
+                && !name.contains(exc)
                 && arch.iter().any(|a| name.contains(a))
         })
         .collect::<Vec<GithubAsset>>();

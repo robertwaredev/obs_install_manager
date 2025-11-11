@@ -1,5 +1,8 @@
 use crate::{install, ui};
-pub use color_eyre::{Result, eyre::eyre};
+pub use color_eyre::{
+    Result,
+    eyre::{self, eyre},
+};
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{DefaultTerminal, prelude::*, widgets::*};
 use std::{sync::mpsc, thread};
@@ -7,6 +10,7 @@ use std::{sync::mpsc, thread};
 pub enum Event {
     Key(KeyEvent),
     Progress(f64),
+    Error(eyre::Report),
 }
 
 pub fn send_key_event(tx: mpsc::Sender<Event>) {
@@ -91,6 +95,7 @@ impl App {
                     }
                 }
                 Event::Progress(ratio) => self.pbar.set_ratio(ratio),
+                Event::Error(report) => return Err(report),
             }
 
             term.draw(|frame| self.draw(frame))?;
@@ -108,7 +113,7 @@ impl App {
             match key_event.code {
                 KeyCode::Up => self.list.state.select_previous(),
                 KeyCode::Down => self.list.state.select_next(),
-                KeyCode::Enter => self.select_accept()?,
+                KeyCode::Enter => self.select_accept(),
                 KeyCode::Esc => self.exit(),
                 _ => (),
             }
@@ -116,13 +121,17 @@ impl App {
         Ok(())
     }
 
-    fn select_accept(&mut self) -> Result<()> {
+    fn select_accept(&mut self) {
         if let Some(selected) = self.list.state.selected() {
             let evtx = self.evtx.clone();
             let item = self.list.items[selected].clone();
-            thread::spawn(move || -> Result<()> { (item.op)(evtx).map_err(|e| eyre!("{e}")) });
+
+            thread::spawn(move || {
+                if let Err(e) = (item.op)(evtx.clone()) {
+                    let _ = evtx.send(Event::Error(e));
+                }
+            });
         }
-        Ok(())
     }
 
     fn exit(&mut self) {
