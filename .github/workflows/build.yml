@@ -51,7 +51,7 @@ jobs:
         run: |
           echo "Installing Rust toolchain for target ${{ matrix.target }}..."
           for i in 1 2 3; do
-            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal --component rustfmt clippy --verbose; then
+            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal; then
               echo "✅ Rust toolchain installed successfully."
               break
             else
@@ -138,7 +138,7 @@ jobs:
         run: |
           echo "Installing Rust toolchain for target ${{ matrix.target }}..."
           for i in 1 2 3; do
-            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal --component rustfmt clippy --verbose; then
+            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal; then
               echo "✅ Rust toolchain installed successfully."
               break
             else
@@ -220,7 +220,7 @@ jobs:
         run: |
           echo "Installing Rust toolchain for target ${{ matrix.target }}..."
           for i in 1 2 3; do
-            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal --component rustfmt clippy --verbose; then
+            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal; then
               echo "✅ Rust toolchain installed successfully."
               break
             else
