@@ -1,4 +1,4 @@
-name: Rust Multiplatform Build (Parallel Builds + macOS Universal)
+name: Rust Multiplatform Build
 
 on:
   push:
