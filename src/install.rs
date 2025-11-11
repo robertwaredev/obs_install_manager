@@ -7,6 +7,7 @@ use color_eyre::{
 };
 use std::{fs, os, sync::mpsc::Sender};
 
+// OBS (Open Broadcast Software)
 pub fn obs(tx: Sender<Event>) -> Result<()> {
     let github_api_client = GithubApiClient::new()?;
 
@@ -193,6 +194,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     Ok(())
 }
 
+// Kilohearts Bundle
 pub fn khs(tx: Sender<Event>) -> Result<()> {
     let exe_path = std::env::current_exe()?;
     let exe_dir = exe_path.parent().unwrap();
@@ -211,6 +213,7 @@ pub fn khs(tx: Sender<Event>) -> Result<()> {
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
+// ReaPlugs Bundle
 pub fn rea(tx: Sender<Event>) -> Result<()> {
     let exe_path = std::env::current_exe()?;
     let exe_dir = exe_path.parent().unwrap();
@@ -226,6 +229,7 @@ pub fn rea(tx: Sender<Event>) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
+// Voicemeeter Banana
 pub fn vmb(tx: Sender<Event>) -> Result<()> {
     let exe_path = std::env::current_exe()?;
     let exe_dir = exe_path.parent().unwrap();
@@ -247,12 +251,14 @@ pub fn vmb(tx: Sender<Event>) -> Result<()> {
 }
 
 #[cfg(target_os = "macos")]
+// BlackHole
 pub fn eab(_: Sender<Event>) -> Result<()> {
     opener::open_browser(&crate::EAB_URL)?;
     Ok(())
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
+// Sonobus
 pub fn sbs(tx: Sender<Event>) -> Result<()> {
     // Build search tags per operating system
     #[cfg(target_os = "windows")]
