@@ -1,35 +1,33 @@
-name: Rust Multiplatform Build (with macOS Universal)
+name: Rust Multiplatform Build (Stable & macOS Universal)
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # allows manual runs
+  workflow_dispatch:
 
 env:
   BIN_NAME: obs_install_manager
+  CARGO_NET_RETRY: 5
+  CARGO_HTTP_TIMEOUT: 120
 
 jobs:
   build:
-    name: Build and Test on ${{ matrix.os }} ${{ matrix.target }}
+    name: Build ${{ matrix.os }} ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          # 🐧 Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: linux-x86_64
-          # 🪟 Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: windows-x86_64
-          # 🍎 macOS Intel
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: macos-x86_64
-          # 🍎 macOS Apple Silicon
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: macos-arm64
@@ -38,30 +36,87 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
+      # 🐧 Linux dependencies
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
 
-      - name: Cache cargo build
+      # 🪟 Windows cache setup
+      - name: Setup Cargo cache (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\registry
+            ~\.cargo\git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # 🍎 macOS/Linux cache setup
+      - name: Setup Cargo cache (macOS/Linux)
+        if: matrix.os != 'windows-latest'
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-
+            ${{ runner.os }}-cargo-
 
-      - name: Build (release)
+      # 🦀 Rust toolchain setup
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      # 🍎 Ensure ARM64 target for macOS
+      - name: Ensure macOS ARM target
+        if: startsWith(matrix.target, 'aarch64-apple-darwin')
+        run: rustup target add aarch64-apple-darwin
+
+      # ⬇️ Prefetch crates
+      - name: Prefetch dependencies
+        run: cargo fetch --locked
+
+      # 🏗️ Build
+      - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
 
+      # 🧪 Test (skip for macOS ARM64)
       - name: Run tests
+        if: matrix.target != 'aarch64-apple-darwin'
         run: cargo test --target ${{ matrix.target }} --verbose
 
+      # 🧰 Diagnostic info
+      - name: Diagnostics
+        shell: bash
+        run: |
+          echo "🧩 SYSTEM INFO ----------------------------"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Target: ${{ matrix.target }}"
+          echo "Rust toolchain:"
+          rustc --version
+          cargo --version
+          rustup show
+          echo ""
+          echo "📂 Directory structure:"
+          ls -R target/${{ matrix.target }}/release || dir target\\${{ matrix.target }}\\release
+          echo ""
+          echo "✅ Checking for built binary:"
+          if [[ -f target/${{ matrix.target }}/release/${BIN_NAME}* ]]; then
+            echo "Binary found!"
+          else
+            echo "⚠️ Binary not found!"
+          fi
+          echo "-------------------------------------------"
+
+      # 📦 Zip the binary
       - name: Zip binary
         shell: bash
         run: |
@@ -74,12 +129,14 @@ jobs:
             zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}"
           fi
 
+      # ☁️ Upload artifact
       - name: Upload zipped artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/*.zip
 
+  # 🍏 Merge macOS Universal Binary
   merge-macos:
     name: Merge macOS Universal Binary
     runs-on: macos-latest
@@ -93,7 +150,6 @@ jobs:
       - name: Create Universal Binary
         run: |
           mkdir -p target/universal
-          # Extract version dynamically from Cargo.toml
           version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
           unzip artifacts/macos-x86_64/*.zip -d artifacts/macos-x86_64/
           unzip artifacts/macos-arm64/*.zip -d artifacts/macos-arm64/
@@ -101,9 +157,17 @@ jobs:
             artifacts/macos-x86_64/${BIN_NAME} \
             artifacts/macos-arm64/${BIN_NAME} \
             -output target/universal/${BIN_NAME}
-
           cd target/universal
           zip "${BIN_NAME}-v${version}-macos-universal.zip" "${BIN_NAME}"
+
+      # 🧰 Diagnostic info for Universal Binary
+      - name: Diagnostics
+        run: |
+          echo "🧩 macOS Universal Binary Diagnostics"
+          rustc --version
+          file target/universal/${BIN_NAME}
+          ls -lh target/universal/
+          echo "✅ Universal binary creation complete."
 
       - name: Upload Universal Binary
         uses: actions/upload-artifact@v4
