@@ -84,19 +84,12 @@ jobs:
           ls -R target/${{ matrix.target }}/release || dir target\\${{ matrix.target }}\\release
           echo "-------------------------------------------"
 
-      - name: Zip binary
-        shell: bash
-        run: |
-          mkdir -p dist
-          version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
-          cd target/${{ matrix.target }}/release
-          zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}.exe"
-
-      - name: Upload artifact
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/*.zip
+            name: ${{ matrix.artifact_name }}
+            path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}.exe
+
 
 # 🍏 MACOS
   build-macos:
@@ -167,18 +160,12 @@ jobs:
           ls -R target/${{ matrix.target }}/release
           echo "-------------------------------------------"
 
-      - name: Zip binary
-        run: |
-          mkdir -p dist
-          version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
-          cd target/${{ matrix.target }}/release
-          zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}"
-
-      - name: Upload artifact
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: dist/*.zip
+          path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
+
 
 # 🐧 LINUX
   build-linux:
@@ -252,18 +239,12 @@ jobs:
           ls -R target/${{ matrix.target }}/release
           echo "-------------------------------------------"
 
-      - name: Zip binary
-        run: |
-          mkdir -p dist
-          version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
-          cd target/${{ matrix.target }}/release
-          zip "../../../dist/${BIN_NAME}-v${version}-${{ matrix.artifact_name }}.zip" "${BIN_NAME}"
+      - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/*.zip
 
 # 🍏 UNIVERSAL MACOS MERGE (waits for all builds)
   merge-macos:
