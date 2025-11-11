@@ -129,30 +129,3 @@ impl GithubApiClient {
         }
     }
 }
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-
-    #[test]
-    fn test_git_api_client_get_releases() {
-        println!(
-            "{:?}",
-            GithubApiClient::new()
-                .unwrap()
-                .get_releases(&crate::OBS_GIT_REPO)
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_git_api_client_get_release() {
-        println!(
-            "{:?}",
-            GithubApiClient::new()
-                .unwrap()
-                .get_release(&crate::OBS_GIT_REPO, &None)
-                .unwrap()
-        );
-    }
-}

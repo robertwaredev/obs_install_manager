@@ -46,7 +46,7 @@ jobs:
             ~/.rustup/update-hashes
           key: rustup-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install Rust toolchain (resilient)
+      - name: Install Rust toolchain
         shell: bash
         run: |
           echo "Installing Rust toolchain for target ${{ matrix.target }}..."
@@ -133,7 +133,7 @@ jobs:
             ~/.rustup/update-hashes
           key: rustup-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install Rust toolchain (resilient)
+      - name: Install Rust toolchain
         shell: bash
         run: |
           echo "Installing Rust toolchain for target ${{ matrix.target }}..."
@@ -216,7 +216,7 @@ jobs:
             ~/.rustup/update-hashes
           key: rustup-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install Rust toolchain (resilient)
+      - name: Install Rust toolchain
         run: |
           echo "Installing Rust toolchain for target ${{ matrix.target }}..."
           for i in 1 2 3; do
