@@ -7,10 +7,7 @@ This is a simple, cross-platform TUI app which handles downloading OBS and relat
 - Automatic download of the latest OBS portable installation.
 - Automatic organization of newly downloaded OBS versions into separate folders which adhere to semantic versioning.
 - Automatic centralization of OBS profiles and scene configurations via a symlinked folder which is shared across all OBS portable installations.
-- Centralized downloads for QjackCtl, Kilohearts free VST bundle, and Sonobus.
 - Automatic download of pre-configured OBS profile and scene collection for quick start. 
-- Automatic downlaod of QJackCtl preset which is designed to function with the OBS profile and scene mentioned above.
-
 
 ## How to Use
 
