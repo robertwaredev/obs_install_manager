@@ -71,19 +71,6 @@ jobs:
       - name: Run tests
         run: cargo test --target ${{ matrix.target }}
 
-      - name: Diagnostics
-        shell: bash
-        run: |
-          echo "🧩 SYSTEM INFO ----------------------------"
-          echo "Runner OS: ${{ runner.os }}"
-          echo "Target: ${{ matrix.target }}"
-          rustc --version
-          cargo --version
-          rustup show
-          echo "✅ Checking for built binary:"
-          ls -R target/${{ matrix.target }}/release || dir target\\${{ matrix.target }}\\release
-          echo "-------------------------------------------"
-
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -154,18 +141,6 @@ jobs:
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Diagnostics
-        run: |
-          echo "🧩 SYSTEM INFO ----------------------------"
-          echo "Runner OS: ${{ runner.os }}"
-          echo "Target: ${{ matrix.target }}"
-          rustc --version
-          cargo --version
-          rustup show
-          echo "✅ Checking for built binary:"
-          ls -R target/${{ matrix.target }}/release
-          echo "-------------------------------------------"
-
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -231,18 +206,6 @@ jobs:
       - name: Run tests
         run: cargo test --target ${{ matrix.target }}
 
-      - name: Diagnostics
-        run: |
-          echo "🧩 SYSTEM INFO ----------------------------"
-          echo "Runner OS: ${{ runner.os }}"
-          echo "Target: ${{ matrix.target }}"
-          rustc --version
-          cargo --version
-          rustup show
-          echo "✅ Checking for built binary:"
-          ls -R target/${{ matrix.target }}/release
-          echo "-------------------------------------------"
-
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -267,19 +230,14 @@ jobs:
           mkdir -p target/universal
           version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
 
-          echo "🧩 Searching for macOS binaries..."
-          x86_bin=$(find artifacts/obs_install_manager_macos_x86_64 -type f -name "${BIN_NAME}-v${version}-macos_x86_64*" | head -n1)
-          arm_bin=$(find artifacts/obs_install_manager_macos_arm64 -type f -name "${BIN_NAME}-v${version}-macos_arm64*" | head -n1)
-
-          echo "🧩 Found x86_64 binary: $x86_bin"
-          echo "🧩 Found arm64 binary: $arm_bin"
+          x86_bin=$(find artifacts/obs_install_manager_macos_x86_64 -type f -name "${BIN_NAME}_v${version}_macos_x86_64*" | head -n1)
+          arm_bin=$(find artifacts/obs_install_manager_macos_arm64 -type f -name "${BIN_NAME}_v${version}_macos_arm64*" | head -n1)
 
           if [[ -z "$x86_bin" || -z "$arm_bin" ]]; then
             echo "❌ Missing one or both architecture binaries for universal merge"
             exit 1
           fi
 
-          # Merge both into one universal binary
           universal_bin="target/universal/${BIN_NAME}-v${version}-macos_universal"
           lipo -create "$x86_bin" "$arm_bin" -output "$universal_bin"
 
@@ -290,5 +248,6 @@ jobs:
       - name: Upload Universal Binary
         uses: actions/upload-artifact@v4
         with:
-          name: obs_install_manager_macos_universal
-          path: target/universal/${{ env.BIN_NAME }}-v*-macos_universal
+          name: ${{ env.BIN_NAME }}_macos_universal
+          path: target/universal/${{ env.BIN_NAME }}_v*_macos_universal
+ 
