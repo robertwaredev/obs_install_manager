@@ -212,42 +212,42 @@ jobs:
           name: ${{ env.BIN_NAME }}_${{ matrix.artifact_name }}
           path: target/${{ matrix.target }}/release/${{ env.BIN_NAME }}
 
-  merge-macos:
-    name: Merge macOS Universal Binary
-    runs-on: macos-latest
-    needs: [build-macos]
+  # merge-macos:
+  #   name: Merge macOS Universal Binary
+  #   runs-on: macos-latest
+  #   needs: [build-macos]
 
-    steps:
-      - name: Download macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
+  #   steps:
+  #     - name: Download macOS artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: ./artifacts
 
-      - name: Merge Universal Binary
-        shell: bash
-        run: |
-          set -e
-          mkdir -p target/universal
-          version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
+  #     - name: Merge Universal Binary
+  #       shell: bash
+  #       run: |
+  #         set -e
+  #         mkdir -p target/universal
+  #         version=$(grep '^version' Cargo.toml | head -n1 | cut -d'"' -f2)
 
-          x86_bin=$(find artifacts/obs_install_manager_macos_x86_64 -type f -name "${BIN_NAME}_v${version}_macos_x86_64*" | head -n1)
-          arm_bin=$(find artifacts/obs_install_manager_macos_arm64 -type f -name "${BIN_NAME}_v${version}_macos_arm64*" | head -n1)
+  #         x86_bin=$(find artifacts/obs_install_manager_macos_x86_64 -type f -name "${BIN_NAME}_v${version}_macos_x86_64*" | head -n1)
+  #         arm_bin=$(find artifacts/obs_install_manager_macos_arm64 -type f -name "${BIN_NAME}_v${version}_macos_arm64*" | head -n1)
 
-          if [[ -z "$x86_bin" || -z "$arm_bin" ]]; then
-            echo "❌ Missing one or both architecture binaries for universal merge"
-            exit 1
-          fi
+  #         if [[ -z "$x86_bin" || -z "$arm_bin" ]]; then
+  #           echo "❌ Missing one or both architecture binaries for universal merge"
+  #           exit 1
+  #         fi
 
-          universal_bin="target/universal/${BIN_NAME}_v${version}_macos_universal"
-          lipo -create "$x86_bin" "$arm_bin" -output "$universal_bin"
+  #         universal_bin="target/universal/${BIN_NAME}_v${version}_macos_universal"
+  #         lipo -create "$x86_bin" "$arm_bin" -output "$universal_bin"
 
-          echo "✅ Universal binary created at: $universal_bin"
-          file "$universal_bin"
-          ls -lh target/universal
+  #         echo "✅ Universal binary created at: $universal_bin"
+  #         file "$universal_bin"
+  #         ls -lh target/universal
 
-      - name: Upload Universal Binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.BIN_NAME }}_macos_universal
-          path: target/universal/${{ env.BIN_NAME }}_v*_macos_universal
+  #     - name: Upload Universal Binary
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ${{ env.BIN_NAME }}_macos_universal
+  #         path: target/universal/${{ env.BIN_NAME }}_v*_macos_universal
  
