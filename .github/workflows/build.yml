@@ -67,13 +67,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      # 🦀 Rust toolchain setup
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      # 🦀 Rust toolchain setup (with retries & progress)
+      - name: Cache Rust toolchain
+        uses: actions/cache@v4
         with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
+          path: |
+            ~/.rustup/toolchains
+            ~/.rustup/update-hashes
+          key: rustup-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Rust toolchain (resilient)
+        shell: bash
+        run: |
+          echo "Installing Rust toolchain for target ${{ matrix.target }}..."
+          for i in 1 2 3; do
+            if rustup toolchain install stable --target ${{ matrix.target }} --profile minimal --component rustfmt clippy --verbose; then
+              echo "✅ Rust toolchain installed successfully."
+              break
+            else
+              echo "⚠️ rustup failed (attempt $i), retrying in 15s..."
+              sleep 15
+            fi
+          done
+          rustup default stable
+          rustup target list --installed
 
       # 🍎 Ensure ARM64 target for macOS
       - name: Ensure macOS ARM target
