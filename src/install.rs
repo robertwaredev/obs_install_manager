@@ -1,4 +1,6 @@
-use crate::{app::Event, file, git::*, scut};
+#[cfg(windows)]
+use crate::scut;
+use crate::{app::Event, file, git::*};
 use color_eyre::{
     Result,
     eyre::{OptionExt, eyre},
@@ -124,7 +126,7 @@ impl Installable for Obs {
             }
 
             // Symlink config folder
-            let link_config = obs_dir.join("config");
+            let link_config = extract_dir.join("config");
             os::unix::fs::symlink(true_config, link_config)?;
         }
 
