@@ -106,8 +106,9 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         let zip_path = exe_dir.join("daw-obs-config-master.zip");
         let zip_name = exe_dir.join("daw-obs-config-master");
         let from = zip_name.join("obs-studio");
-        let to =
-            std::path::Path::new("~/Library/Application Support/obs-studio/").canonicalize()?;
+        let to = std::path::Path::new("~/Library/Application Support/")
+            .canonicalize()?
+            .join("obs-studio");
 
         if !to.exists() {
             fs::create_dir(&to)?;
