@@ -5,7 +5,7 @@ use color_eyre::{
     Result,
     eyre::{OptionExt, eyre},
 };
-use std::{fs, os, str::FromStr, sync::mpsc::Sender};
+use std::{fs, os, sync::mpsc::Sender};
 
 // OBS (Open Broadcast Software)
 pub fn obs(tx: Sender<Event>) -> Result<()> {

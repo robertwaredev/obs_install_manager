@@ -7,6 +7,8 @@ use std::{
     path::Path,
     process::{Command, ExitStatus},
     sync::mpsc,
+    thread,
+    time::Duration,
 };
 
 pub fn download<P: AsRef<Path>>(
@@ -66,86 +68,64 @@ pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
 }
 
 // #[cfg(target_os = "macos")]
-use color_eyre::eyre::{WrapErr, eyre};
+use color_eyre::eyre::eyre;
 
 pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
-    // Mount the DMG without -plist (easier to parse)
-    let output = Command::new("hdiutil")
-        .args(["attach", dmg_path, "-nobrowse", "-quiet"])
-        .output()
-        .wrap_err("Failed to mount DMG")?;
+    // Open the DMG (macOS will mount it automatically)
+    Command::new("open").arg(dmg_path).status()?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(eyre!("hdiutil attach failed: {}", stderr));
+    // Wait for the volume to appear with retry logic
+    let mount_point = wait_for_mount(app_name, 30)?;
+    let app_source = format!("{}/{}", mount_point, app_name);
+
+    // Verify the app exists in the mounted volume
+    if !Path::new(&app_source).exists() {
+        return Err(eyre!("App not found at: {}", app_source));
     }
 
-    let output_str = String::from_utf8_lossy(&output.stdout);
-    let stderr_str = String::from_utf8_lossy(&output.stderr);
+    // Copy the app
+    let cp_result = Command::new("cp")
+        .args(["-R", &app_source, "/Applications/"])
+        .status()?;
 
-    // Parse mount point from output (last column of last line)
-    let mount_point = output_str
-        .lines()
-        .filter(|line| line.contains("/Volumes/"))
-        .last()
-        .and_then(|line| {
-            // The mount point is the last field
-            line.split_whitespace().last()
-        })
-        .ok_or_else(|| {
-            eyre!(
-                "Failed to find mount point in hdiutil output.\n\
-                 STDOUT:\n{}\n\
-                 STDERR:\n{}",
-                output_str,
-                stderr_str
-            )
-        })?;
+    if !cp_result.success() {
+        return Err(eyre!("Failed to copy app"));
+    }
 
-    // Ensure cleanup happens even if copy fails
-    let result = (|| -> Result<()> {
-        let app_source = format!("{}/{}", mount_point, app_name);
-        let app_dest = format!("/Applications/{}", app_name);
+    // Eject the volume
+    Command::new("hdiutil")
+        .args(["detach", &mount_point])
+        .status()?;
 
-        // Check if source exists
-        if !std::path::Path::new(&app_source).exists() {
-            return Err(eyre!("App not found at: {}", app_source));
-        }
+    Ok(())
+}
 
-        // Remove existing app if present
-        if std::path::Path::new(&app_dest).exists() {
-            let rm_status = Command::new("rm")
-                .args(["-rf", &app_dest])
-                .status()
-                .wrap_err("Failed to remove existing app")?;
+fn wait_for_mount(app_name: &str, max_attempts: u32) -> Result<String> {
+    let base_name = app_name.trim_end_matches(".app");
 
-            if !rm_status.success() {
-                return Err(eyre!("Failed to remove existing app"));
+    for attempt in 0..max_attempts {
+        // List volumes
+        let output = Command::new("ls").arg("/Volumes/").output()?;
+
+        let volumes = String::from_utf8_lossy(&output.stdout);
+
+        // Look for a volume that matches the app name
+        if let Some(volume) = volumes.lines().find(|line| line.contains(base_name)) {
+            let mount_point = format!("/Volumes/{}", volume.trim());
+
+            // Verify it's actually mounted and accessible
+            if Path::new(&mount_point).exists() {
+                return Ok(mount_point);
             }
         }
 
-        // Copy the app
-        let cp_output = Command::new("cp")
-            .args(["-R", &app_source, &app_dest])
-            .output()
-            .wrap_err("Failed to execute cp command")?;
-
-        if !cp_output.status.success() {
-            let stderr = String::from_utf8_lossy(&cp_output.stderr);
-            return Err(eyre!("cp command failed: {}", stderr));
-        }
-
-        Ok(())
-    })();
-
-    // Always unmount, even if copy failed
-    let unmount_result = Command::new("hdiutil")
-        .args(["detach", mount_point, "-force", "-quiet"])
-        .output();
-
-    if let Err(e) = &unmount_result {
-        eprintln!("Warning: Failed to unmount: {}", e);
+        // Exponential backoff: 100ms, 200ms, 400ms, 800ms, then cap at 1s
+        let delay = Duration::from_millis(100 * 2u64.pow(attempt.min(3)));
+        thread::sleep(delay);
     }
 
-    result
+    Err(eyre!(
+        "Timed out waiting for DMG to mount. Expected volume containing '{}'",
+        base_name
+    ))
 }
