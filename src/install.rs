@@ -100,7 +100,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         // Install DMG
         file::install_dmg(
             &file_path.to_str().unwrap(),
-            &file_name.join(".app").to_str().unwrap(),
+            &file_name.to_str().unwrap(),
             "OBS",
         )?;
 

@@ -70,22 +70,22 @@ pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
 // #[cfg(target_os = "macos")]
 use color_eyre::eyre::eyre;
 
-pub fn install_dmg(dmg_path: &str, app_name: &str, mount_tag: &str) -> Result<()> {
+pub fn install_dmg(dmg_path: &str, mount_tag: &str) -> Result<()> {
     // Open the DMG (macOS will mount it automatically)
     Command::new("open").arg(dmg_path).status()?;
 
-    // Wait for the volume to appear with retry logic
+    // Wait for any volume to appear
     let mount_point = wait_for_mount(mount_tag, 30)?;
-    let app_source = format!("{}/{}", mount_point, app_name);
 
-    // Verify the app exists in the mounted volume
-    if !Path::new(&app_source).exists() {
-        return Err(eyre!("App not found at: {}", app_source));
-    }
+    // Find the .app in the mounted volume
+    let app_name = find_app(&mount_point)?;
+
+    let app_source = format!("{}/{}", mount_point, app_name);
+    let app_dest = format!("/Applications/{}", app_name);
 
     // Copy the app
     let cp_result = Command::new("cp")
-        .args(["-R", &app_source, "/Applications/"])
+        .args(["-R", &app_source, &app_dest])
         .status()?;
 
     if !cp_result.success() {
@@ -121,4 +121,39 @@ fn wait_for_mount(mount_tag: &str, max_attempts: u32) -> Result<String> {
         "Timed out waiting for DMG to mount. Expected volume containing '{}'",
         mount_tag
     ))
+}
+
+// fn get_volumes() -> Result<Vec<String>> {
+//     let output = Command::new("ls").arg("/Volumes/").output()?;
+
+//     Ok(String::from_utf8_lossy(&output.stdout)
+//         .lines()
+//         .map(|s| s.trim().to_string())
+//         .filter(|s| !s.is_empty())
+//         .collect())
+// }
+
+fn find_app(mount_point: &str) -> Result<String> {
+    // Read directory contents
+    let entries =
+        fs::read_dir(mount_point).map_err(|e| eyre!("Failed to read volume directory: {}", e))?;
+
+    // Find .app bundles
+    let apps: Vec<String> = entries
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext == "app")
+                .unwrap_or(false)
+        })
+        .filter_map(|entry| entry.file_name().to_str().map(|s| s.to_string()))
+        .collect();
+
+    // Return the first .app found
+    apps.into_iter()
+        .next()
+        .ok_or_else(|| eyre!("No .app bundle found in mounted volume"))
 }
