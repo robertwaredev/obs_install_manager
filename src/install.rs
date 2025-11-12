@@ -105,8 +105,8 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         let home = std::env::var("HOME").map_err(|_| eyre!("Could not find home directory!"))?;
 
         // OBS Profile & Scene Collection
-        let zip_path = exe_dir.join("daw-obs-config-master.zip");
-        let zip_name = exe_dir.join("daw-obs-config-master");
+        let zip_path = exe_dir.join("daw-obs-config-macos-master.zip");
+        let zip_name = exe_dir.join("daw-obs-config-macos-master");
         let from = zip_name.join("obs-studio");
         let to = std::path::PathBuf::from(&home).join("Library/Application Support/obs-studio");
 
