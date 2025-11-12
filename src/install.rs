@@ -101,15 +101,16 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     {
         // Install DMG
         file::install_dmg(&file_path.to_str().unwrap(), "OBS")?;
-        fs::remove(&file_path);
+        fs::remove_file(&file_path)?;
 
         let home = std::env::var("HOME").map_err(|_| eyre!("Could not find home directory!"))?;
+        let home = std::path::PathBuf::from(&home);
 
         // OBS Profile & Scene Collection
         let zip_path = exe_dir.join("daw-obs-config-macos-master.zip");
         let zip_name = exe_dir.join("daw-obs-config-macos-master");
         let from = zip_name.join("obs-studio");
-        let to = std::path::PathBuf::from(&home).join("Library/Application Support/obs-studio");
+        let to = home.join("Library/Application Support/obs-studio");
 
         if !to.exists() {
             fs::create_dir(&to)?;
