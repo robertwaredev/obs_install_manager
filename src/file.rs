@@ -81,6 +81,7 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
     }
 
     let output_str = String::from_utf8_lossy(&output.stdout);
+    let stderr_str = String::from_utf8_lossy(&output.stderr);
 
     // Parse mount point from output (last column of last line)
     let mount_point = output_str
@@ -91,7 +92,15 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
             // The mount point is the last field
             line.split_whitespace().last()
         })
-        .ok_or_else(|| eyre!("Failed to find mount point in hdiutil output"))?;
+        .ok_or_else(|| {
+            eyre!(
+                "Failed to find mount point in hdiutil output.\n\
+                 STDOUT:\n{}\n\
+                 STDERR:\n{}",
+                output_str,
+                stderr_str
+            )
+        })?;
 
     // Ensure cleanup happens even if copy fails
     let result = (|| -> Result<()> {
