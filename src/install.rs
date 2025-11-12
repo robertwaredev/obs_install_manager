@@ -5,7 +5,7 @@ use color_eyre::{
     Result,
     eyre::{OptionExt, eyre},
 };
-use std::{fs, os, str::FromStr, sync::mpsc::Sender};
+use std::{fs, os, sync::mpsc::Sender};
 
 // OBS (Open Broadcast Software)
 pub fn obs(tx: Sender<Event>) -> Result<()> {
@@ -101,6 +101,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     {
         // Install DMG
         file::install_dmg(&file_path.to_str().unwrap(), "OBS")?;
+        fs::remove(&file_path);
 
         let home = std::env::var("HOME").map_err(|_| eyre!("Could not find home directory!"))?;
 
@@ -116,10 +117,14 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         if !zip_path.exists() {
             file::download(&crate::OBS_CONFIG_URL.to_string(), &zip_path, &tx)?;
         }
+
         file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
         fs::rename(&from, &to)?;
         fs::remove_file(&zip_path)?;
         fs::remove_dir_all(&zip_name)?;
+
+        // Open applications directory
+        opener::open(home.join("Applications"))?;
     }
 
     // OBS ASIO Plugin
@@ -201,10 +206,10 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
             let target_path = extract_dir.join("bin/64bit/obs64.exe");
             scut::create_shortcut(scut_path, target_path)?;
         }
-    }
 
-    // Open executable directory
-    opener::open(exe_dir)?;
+        // Open executable directory
+        opener::open(exe_dir)?;
+    }
 
     Ok(())
 }
