@@ -102,21 +102,17 @@ pub fn install_dmg(dmg_path: &str, app_name: &str, mount_tag: &str) -> Result<()
 
 fn wait_for_mount(mount_tag: &str, max_attempts: u32) -> Result<String> {
     for attempt in 0..max_attempts {
-        // List volumes
         let output = Command::new("ls").arg("/Volumes/").output()?;
         let volumes = String::from_utf8_lossy(&output.stdout);
 
-        // Look for a volume that matches the app name
         if let Some(volume) = volumes.lines().find(|line| line.contains(mount_tag)) {
             let mount_point = format!("/Volumes/{}", volume.trim());
 
-            // Verify it's actually mounted and accessible
             if Path::new(&mount_point).exists() {
                 return Ok(mount_point);
             }
         }
 
-        // Exponential backoff: 100ms, 200ms, 400ms, 800ms, then cap at 1s
         let delay = Duration::from_millis(100 * 2u64.pow(attempt.min(3)));
         thread::sleep(delay);
     }
