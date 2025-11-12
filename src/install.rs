@@ -5,7 +5,7 @@ use color_eyre::{
     Result,
     eyre::{OptionExt, eyre},
 };
-use std::{fs, os, sync::mpsc::Sender};
+use std::{fs, os, str::FromStr, sync::mpsc::Sender};
 
 // OBS (Open Broadcast Software)
 pub fn obs(tx: Sender<Event>) -> Result<()> {
@@ -111,8 +111,22 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         //     std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/basic");
         // os::unix::fs::symlink(true_config, link_config)?;
 
-        // let config_dir =
-        //     std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/basic");
+        // OBS Profile & Scene Collection
+        let zip_path = exe_dir.join("daw-obs-config-master.zip");
+        let zip_name = exe_dir.join("daw-obs-config-master");
+        let from = zip_name.join("obs-studio");
+        let to = std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/")?;
+
+        if !to.exists() {
+            fs::create_dir(&to)?;
+        }
+        if !zip_path.exists() {
+            file::download(&crate::OBS_CONFIG_URL.to_string(), &zip_path, &tx)?;
+        }
+        file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
+        fs::rename(&from, &to)?;
+        fs::remove_file(&zip_path)?;
+        fs::remove_dir_all(&zip_name)?;
     }
 
     // OBS ASIO Plugin

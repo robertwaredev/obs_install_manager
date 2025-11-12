@@ -1,5 +1,5 @@
 use crate::app::{Event, send_progress_event};
-use color_eyre::Result;
+use color_eyre::{Result, eyre::eyre};
 use curl::easy::{Easy, WriteError};
 use std::{
     fs,
@@ -67,32 +67,24 @@ pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
     Ok(Command::new(path.as_ref().as_os_str()).spawn()?.wait()?)
 }
 
-// #[cfg(target_os = "macos")]
-use color_eyre::eyre::eyre;
-
 pub fn install_dmg(dmg_path: &str, mount_tag: &str) -> Result<()> {
-    // Open the DMG (macOS will mount it automatically)
     Command::new("open").arg(dmg_path).status()?;
 
-    // Wait for any volume to appear
     let mount_point = wait_for_mount(mount_tag, 30)?;
-
-    // Find the .app in the mounted volume
     let app_name = find_app(&mount_point)?;
+    let app_src = format!("{}/{}", mount_point, app_name);
+    let app_dst = format!("/Applications/{}", app_name);
 
-    let app_source = format!("{}/{}", mount_point, app_name);
-    let app_dest = format!("/Applications/{}", app_name);
+    if !fs::exists(&app_dst).unwrap() {
+        let result = Command::new("cp")
+            .args(["-R", &app_src, &app_dst])
+            .status()?;
 
-    // Copy the app
-    let cp_result = Command::new("cp")
-        .args(["-R", &app_source, &app_dest])
-        .status()?;
-
-    if !cp_result.success() {
-        return Err(eyre!("Failed to copy app"));
+        if !result.success() {
+            return Err(eyre!("Failed to copy app"));
+        }
     }
 
-    // Eject the volume
     Command::new("hdiutil")
         .args(["detach", &mount_point])
         .status()?;
@@ -122,16 +114,6 @@ fn wait_for_mount(mount_tag: &str, max_attempts: u32) -> Result<String> {
         mount_tag
     ))
 }
-
-// fn get_volumes() -> Result<Vec<String>> {
-//     let output = Command::new("ls").arg("/Volumes/").output()?;
-
-//     Ok(String::from_utf8_lossy(&output.stdout)
-//         .lines()
-//         .map(|s| s.trim().to_string())
-//         .filter(|s| !s.is_empty())
-//         .collect())
-// }
 
 fn find_app(mount_point: &str) -> Result<String> {
     // Read directory contents
