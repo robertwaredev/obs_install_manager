@@ -5,7 +5,7 @@ use color_eyre::{
     Result,
     eyre::{OptionExt, eyre},
 };
-use std::{fs, os, sync::mpsc::Sender};
+use std::{fs, os, str::FromStr, sync::mpsc::Sender};
 
 // OBS (Open Broadcast Software)
 pub fn obs(tx: Sender<Event>) -> Result<()> {
@@ -94,25 +94,25 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         }
     }
 
-    // Main main setup
-    #[cfg(target_os = "macos")]
+    // MacOS main setup
+    // #[cfg(target_os = "macos")]
     {
         // Install DMG
-        file::install_dmg(&file_path.to_str().unwrap(), &file_name.to_str().unwrap());
-    }
+        file::install_dmg(&file_path.to_str().unwrap(), &file_name.to_str().unwrap())?;
 
-    // Unix main setup
-    #[cfg(target_family = "unix")]
-    {
-        // Create config true folder
-        let true_config = exe_dir.join("obs-config");
-        if !true_config.exists() {
-            fs::create_dir(&true_config)?;
-        }
+        // // Create config true folder
+        // let true_config = exe_dir.join("obs-config");
+        // if !true_config.exists() {
+        //     fs::create_dir(&true_config)?;
+        // }
 
-        // Symlink config link folder
-        let link_config = extract_dir.join("config");
-        os::unix::fs::symlink(true_config, link_config)?;
+        // // Symlink config link folder
+        // let link_config =
+        //     std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/basic");
+        // os::unix::fs::symlink(true_config, link_config)?;
+
+        let config_dir =
+            std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/basic");
     }
 
     // OBS ASIO Plugin
@@ -195,7 +195,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         }
     }
 
-    // Open install directory
+    // Open executable directory
     opener::open(exe_dir)?;
 
     Ok(())

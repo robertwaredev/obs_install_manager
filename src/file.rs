@@ -67,69 +67,113 @@ pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
     Ok(Command::new(path.as_ref().as_os_str()).spawn()?.wait()?)
 }
 
-#[cfg(target_os = "macos")]
+// #[cfg(target_os = "macos")]
+use color_eyre::eyre::{WrapErr, eyre};
+use plist::Value;
+
 pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
+    println!("Mounting DMG: {}", dmg_path);
+
     // Mount the DMG
     let output = Command::new("hdiutil")
         .args(["attach", dmg_path, "-nobrowse", "-quiet", "-plist"])
         .output()
-        .context("Failed to mount DMG")?;
+        .wrap_err("Failed to mount DMG")?;
 
     if !output.status.success() {
-        return Err(eyre!("hdiutil attach failed"));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(eyre!("hdiutil attach failed: {}", stderr));
     }
 
-    let plist_output = String::from_utf8_lossy(&output.stdout);
+    println!("Parsing plist...");
 
-    // Parse mount point from plist (more reliable)
-    // Might want to use a plist parser crate like `plist`
-    let mount_point = extract_mount_point_from_plist(&plist_output)?;
+    // Parse the plist output
+    let mount_point =
+        extract_mount_point_from_plist(&output.stdout).wrap_err("Failed to extract mount point")?;
+
+    println!("Mounted at: {}", mount_point);
 
     // Ensure cleanup happens even if copy fails
     let result = (|| -> Result<()> {
         let app_source = format!("{}/{}", mount_point, app_name);
         let app_dest = format!("/Applications/{}", app_name);
 
-        // Remove existing app if present
-        let _ = Command::new("rm").args(["-rf", &app_dest]).status();
+        println!("Copying from {} to {}", app_source, app_dest);
 
-        // Copy the app
-        let status = Command::new("cp")
-            .args(["-R", &app_source, &app_dest])
-            .status()
-            .context("Failed to copy app")?;
-
-        if !status.success() {
-            return Err(eyre!("cp command failed"));
+        // Check if source exists
+        if !std::path::Path::new(&app_source).exists() {
+            return Err(eyre!("App not found at: {}", app_source));
         }
 
+        // Remove existing app if present
+        if std::path::Path::new(&app_dest).exists() {
+            println!("Removing existing app at {}", app_dest);
+            let rm_status = Command::new("rm")
+                .args(["-rf", &app_dest])
+                .status()
+                .wrap_err("Failed to remove existing app")?;
+
+            if !rm_status.success() {
+                return Err(eyre!("Failed to remove existing app"));
+            }
+        }
+
+        // Copy the app
+        let cp_output = Command::new("cp")
+            .args(["-R", &app_source, &app_dest])
+            .output()
+            .wrap_err("Failed to execute cp command")?;
+
+        if !cp_output.status.success() {
+            let stderr = String::from_utf8_lossy(&cp_output.stderr);
+            return Err(eyre!("cp command failed: {}", stderr));
+        }
+
+        println!("Successfully copied app to Applications");
         Ok(())
     })();
 
     // Always unmount, even if copy failed
-    Command::new("hdiutil")
+    println!("Unmounting DMG...");
+    let unmount_result = Command::new("hdiutil")
         .args(["detach", &mount_point, "-force", "-quiet"])
-        .status()
-        .context("Failed to unmount DMG")?;
+        .output()
+        .wrap_err("Failed to unmount DMG");
+
+    if let Err(e) = &unmount_result {
+        eprintln!("Warning: Failed to unmount: {}", e);
+    }
 
     result
 }
 
-#[cfg(target_os = "macos")]
-fn extract_mount_point_from_plist(plist: &str) -> Result<String> {
-    // Simple parsing - in production use the `plist` crate
-    for line in plist.lines() {
-        if line.contains("<key>mount-point</key>") {
-            // Next line should have the value
-            continue;
-        }
-        if line.contains("<string>/Volumes/") {
-            return Ok(line
-                .trim()
-                .trim_start_matches("<string>")
-                .trim_end_matches("</string>")
-                .to_string());
+fn extract_mount_point_from_plist(plist_data: &[u8]) -> Result<String> {
+    // Debug: print raw plist
+    println!("Plist data length: {} bytes", plist_data.len());
+
+    // Parse the plist
+    let value = Value::from_reader_xml(plist_data).wrap_err("Failed to parse plist")?;
+
+    // The structure is a dictionary with "system-entities" array
+    let dict = value
+        .as_dictionary()
+        .ok_or_else(|| eyre!("Plist root is not a dictionary"))?;
+
+    let entities = dict
+        .get("system-entities")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| eyre!("No system-entities array in plist"))?;
+
+    // Find the mount point in the entities
+    for entity in entities.iter() {
+        if let Some(entity_dict) = entity.as_dictionary() {
+            if let Some(mount_point) = entity_dict.get("mount-point") {
+                if let Some(path) = mount_point.as_string() {
+                    return Ok(path.to_string());
+                }
+            }
         }
     }
+
     Err(eyre!("Could not find mount point in plist"))
 }
