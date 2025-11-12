@@ -107,7 +107,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         // Create config true folder
         let true_config = exe_dir.join("obs-config");
         if !true_config.exists() {
-            os::unix::fs::create_dir(&true_config)?;
+            fs::create_dir(&true_config)?;
         }
 
         // Symlink config link folder
