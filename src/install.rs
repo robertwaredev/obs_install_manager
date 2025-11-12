@@ -55,7 +55,9 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     }
 
     // Download asset
-    file::download(&git_asset.browser_download_url, &file_path, &tx)?;
+    if !file_path.exists() {
+        file::download(&git_asset.browser_download_url, &file_path, &tx)?;
+    }
 
     // Windows main setup
     #[cfg(target_os = "windows")]
@@ -95,27 +97,17 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     }
 
     // MacOS main setup
-    #[cfg(target_os = "macos")]
+    // #[cfg(target_os = "macos")]
     {
         // Install DMG
         file::install_dmg(&file_path.to_str().unwrap(), "OBS")?;
-
-        // // Create config true folder
-        // let true_config = exe_dir.join("obs-config");
-        // if !true_config.exists() {
-        //     fs::create_dir(&true_config)?;
-        // }
-
-        // // Symlink config link folder
-        // let link_config =
-        //     std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/basic");
-        // os::unix::fs::symlink(true_config, link_config)?;
 
         // OBS Profile & Scene Collection
         let zip_path = exe_dir.join("daw-obs-config-master.zip");
         let zip_name = exe_dir.join("daw-obs-config-master");
         let from = zip_name.join("obs-studio");
-        let to = std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/")?;
+        let to = std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/")?
+            .canonicalize()?;
 
         if !to.exists() {
             fs::create_dir(&to)?;
