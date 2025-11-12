@@ -1,7 +1,7 @@
 use crate::app::{Event, send_progress_event};
 use color_eyre::Result;
 #[cfg(target_os = "macos")]
-use color_eyre::eyre::{WrapErr, eyre::eyre};
+use color_eyre::eyre::{WrapErr, eyre};
 use curl::easy::{Easy, WriteError};
 use std::{
     fs,
