@@ -3,7 +3,7 @@ use color_eyre::Result;
 use curl::easy::{Easy, WriteError};
 use std::{
     fs,
-    io::{self, Write},
+    io::{self, Cursor, Write},
     path::Path,
     process::{Command, ExitStatus},
     sync::mpsc,
@@ -136,7 +136,8 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
 
 fn extract_mount_point_from_plist(plist_data: &[u8]) -> Result<String> {
     // Parse the plist
-    let value = Value::from_reader_xml(plist_data).wrap_err("Failed to parse plist")?;
+    let cursor = Cursor::new(plist_data);
+    let value = Value::from_reader(cursor).wrap_err("Failed to parse plist")?;
 
     // The structure is a dictionary with "system-entities" array
     let dict = value
