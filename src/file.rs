@@ -3,7 +3,7 @@ use color_eyre::Result;
 use curl::easy::{Easy, WriteError};
 use std::{
     fs,
-    io::{self, Cursor, Write},
+    io::{self, Write},
     path::Path,
     process::{Command, ExitStatus},
     sync::mpsc,
@@ -67,12 +67,11 @@ pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
 
 // #[cfg(target_os = "macos")]
 use color_eyre::eyre::{WrapErr, eyre};
-use plist::Value;
 
 pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
-    // Mount the DMG
+    // Mount the DMG without -plist (easier to parse)
     let output = Command::new("hdiutil")
-        .args(["attach", dmg_path, "-nobrowse", "-quiet", "-plist"])
+        .args(["attach", dmg_path, "-nobrowse", "-quiet"])
         .output()
         .wrap_err("Failed to mount DMG")?;
 
@@ -81,9 +80,18 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
         return Err(eyre!("hdiutil attach failed: {}", stderr));
     }
 
-    // Parse the plist output
-    let mount_point =
-        extract_mount_point_from_plist(&output.stdout).wrap_err("Failed to extract mount point")?;
+    let output_str = String::from_utf8_lossy(&output.stdout);
+
+    // Parse mount point from output (last column of last line)
+    let mount_point = output_str
+        .lines()
+        .filter(|line| line.contains("/Volumes/"))
+        .last()
+        .and_then(|line| {
+            // The mount point is the last field
+            line.split_whitespace().last()
+        })
+        .ok_or_else(|| eyre!("Failed to find mount point in hdiutil output"))?;
 
     // Ensure cleanup happens even if copy fails
     let result = (|| -> Result<()> {
@@ -123,42 +131,12 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
 
     // Always unmount, even if copy failed
     let unmount_result = Command::new("hdiutil")
-        .args(["detach", &mount_point, "-force", "-quiet"])
-        .output()
-        .wrap_err("Failed to unmount DMG");
+        .args(["detach", mount_point, "-force", "-quiet"])
+        .output();
 
     if let Err(e) = &unmount_result {
         eprintln!("Warning: Failed to unmount: {}", e);
     }
 
     result
-}
-
-fn extract_mount_point_from_plist(plist_data: &[u8]) -> Result<String> {
-    // Parse the plist
-    let cursor = Cursor::new(plist_data);
-    let value = Value::from_reader(cursor).wrap_err("Failed to parse plist")?;
-
-    // The structure is a dictionary with "system-entities" array
-    let dict = value
-        .as_dictionary()
-        .ok_or_else(|| eyre!("Plist root is not a dictionary"))?;
-
-    let entities = dict
-        .get("system-entities")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| eyre!("No system-entities array in plist"))?;
-
-    // Find the mount point in the entities
-    for entity in entities.iter() {
-        if let Some(entity_dict) = entity.as_dictionary() {
-            if let Some(mount_point) = entity_dict.get("mount-point") {
-                if let Some(path) = mount_point.as_string() {
-                    return Ok(path.to_string());
-                }
-            }
-        }
-    }
-
-    Err(eyre!("Could not find mount point in plist"))
 }
