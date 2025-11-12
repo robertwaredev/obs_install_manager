@@ -98,7 +98,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         // Install DMG
-        file::install_dmg(file_path, &file_name.to_str());
+        file::install_dmg(file_path, &file_name.to_str().unwrap());
     }
 
     // Unix main setup
