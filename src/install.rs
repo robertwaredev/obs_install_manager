@@ -148,6 +148,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     }
 
     // OBS atkAudio Plugin
+    #[cfg(target_os = "windows")]
     {
         // Get latest release assets
         let git_release = github_api_client.get_release(&crate::OBS_ATK_AUDIO_REPO, &None)?;
