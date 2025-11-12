@@ -125,7 +125,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         fs::remove_dir_all(&zip_name)?;
 
         // Open applications directory
-        opener::open(home.join("Applications"))?;
+        opener::open("Applications")?;
     }
 
     // OBS ASIO Plugin
