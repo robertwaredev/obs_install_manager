@@ -70,12 +70,12 @@ pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
 // #[cfg(target_os = "macos")]
 use color_eyre::eyre::eyre;
 
-pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
+pub fn install_dmg(dmg_path: &str, app_name: &str, mount_tag: &str) -> Result<()> {
     // Open the DMG (macOS will mount it automatically)
     Command::new("open").arg(dmg_path).status()?;
 
     // Wait for the volume to appear with retry logic
-    let mount_point = wait_for_mount(app_name, 30)?;
+    let mount_point = wait_for_mount(mount_tag, 30)?;
     let app_source = format!("{}/{}", mount_point, app_name);
 
     // Verify the app exists in the mounted volume
@@ -100,17 +100,14 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
     Ok(())
 }
 
-fn wait_for_mount(app_name: &str, max_attempts: u32) -> Result<String> {
-    let base_name = app_name.trim_end_matches(".app");
-
+fn wait_for_mount(mount_tag: &str, max_attempts: u32) -> Result<String> {
     for attempt in 0..max_attempts {
         // List volumes
         let output = Command::new("ls").arg("/Volumes/").output()?;
-
         let volumes = String::from_utf8_lossy(&output.stdout);
 
         // Look for a volume that matches the app name
-        if let Some(volume) = volumes.lines().find(|line| line.contains(base_name)) {
+        if let Some(volume) = volumes.lines().find(|line| line.contains(mount_tag)) {
             let mount_point = format!("/Volumes/{}", volume.trim());
 
             // Verify it's actually mounted and accessible
@@ -126,6 +123,6 @@ fn wait_for_mount(app_name: &str, max_attempts: u32) -> Result<String> {
 
     Err(eyre!(
         "Timed out waiting for DMG to mount. Expected volume containing '{}'",
-        base_name
+        mount_tag
     ))
 }

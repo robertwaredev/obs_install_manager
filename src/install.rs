@@ -98,7 +98,11 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         // Install DMG
-        file::install_dmg(&file_path.to_str().unwrap(), &file_name.to_str().unwrap())?;
+        file::install_dmg(
+            &file_path.to_str().unwrap(),
+            &file_name.to_str().unwrap(),
+            "OBS",
+        )?;
 
         // // Create config true folder
         // let true_config = exe_dir.join("obs-config");
