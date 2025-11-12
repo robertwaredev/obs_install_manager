@@ -94,19 +94,23 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         }
     }
 
+    // Main main setup
+    #[cfg(target_os = "macos")]
+    {
+        // Install DMG
+        file::install_dmg(file_path, &file_name.to_str());
+    }
+
     // Unix main setup
     #[cfg(target_family = "unix")]
     {
-        // Install DMG
-        file::install_dmg(file_path, file_name);
-
         // Create config true folder
         let true_config = exe_dir.join("obs-config");
         if !true_config.exists() {
             os::unix::fs::create_dir(&true_config)?;
         }
 
-        // Symlink config folder
+        // Symlink config link folder
         let link_config = extract_dir.join("config");
         os::unix::fs::symlink(true_config, link_config)?;
     }

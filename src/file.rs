@@ -1,5 +1,7 @@
 use crate::app::{Event, send_progress_event};
-use color_eyre::{Result, eyre::WrapErr, eyre::eyre};
+use color_eyre::Result;
+#[cfg(target_os = "macos")]
+use color_eyre::eyre::{WrapErr, eyre::eyre};
 use curl::easy::{Easy, WriteError};
 use std::{
     fs,
@@ -65,6 +67,7 @@ pub fn run<P: AsRef<Path>>(path: P) -> io::Result<ExitStatus> {
     Ok(Command::new(path.as_ref().as_os_str()).spawn()?.wait()?)
 }
 
+#[cfg(target_os = "macos")]
 pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
     // Mount the DMG
     let output = Command::new("hdiutil")
@@ -79,7 +82,7 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
     let plist_output = String::from_utf8_lossy(&output.stdout);
 
     // Parse mount point from plist (more reliable)
-    // You might want to use a plist parser crate like `plist`
+    // Might want to use a plist parser crate like `plist`
     let mount_point = extract_mount_point_from_plist(&plist_output)?;
 
     // Ensure cleanup happens even if copy fails
@@ -112,6 +115,7 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
     result
 }
 
+#[cfg(target_os = "macos")]
 fn extract_mount_point_from_plist(plist: &str) -> Result<String> {
     // Simple parsing - in production use the `plist` crate
     for line in plist.lines() {
