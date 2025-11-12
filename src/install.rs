@@ -95,7 +95,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     }
 
     // MacOS main setup
-    // #[cfg(target_os = "macos")]
+    #[cfg(target_os = "macos")]
     {
         // Install DMG
         file::install_dmg(&file_path.to_str().unwrap(), &file_name.to_str().unwrap())?;
@@ -111,8 +111,8 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         //     std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/basic");
         // os::unix::fs::symlink(true_config, link_config)?;
 
-        let config_dir =
-            std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/basic");
+        // let config_dir =
+        //     std::path::PathBuf::from_str("~/Library/Application Support/obs-studio/basic");
     }
 
     // OBS ASIO Plugin

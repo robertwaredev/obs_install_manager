@@ -1,7 +1,5 @@
 use crate::app::{Event, send_progress_event};
 use color_eyre::Result;
-#[cfg(target_os = "macos")]
-use color_eyre::eyre::{WrapErr, eyre};
 use curl::easy::{Easy, WriteError};
 use std::{
     fs,
@@ -72,8 +70,6 @@ use color_eyre::eyre::{WrapErr, eyre};
 use plist::Value;
 
 pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
-    println!("Mounting DMG: {}", dmg_path);
-
     // Mount the DMG
     let output = Command::new("hdiutil")
         .args(["attach", dmg_path, "-nobrowse", "-quiet", "-plist"])
@@ -85,20 +81,14 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
         return Err(eyre!("hdiutil attach failed: {}", stderr));
     }
 
-    println!("Parsing plist...");
-
     // Parse the plist output
     let mount_point =
         extract_mount_point_from_plist(&output.stdout).wrap_err("Failed to extract mount point")?;
-
-    println!("Mounted at: {}", mount_point);
 
     // Ensure cleanup happens even if copy fails
     let result = (|| -> Result<()> {
         let app_source = format!("{}/{}", mount_point, app_name);
         let app_dest = format!("/Applications/{}", app_name);
-
-        println!("Copying from {} to {}", app_source, app_dest);
 
         // Check if source exists
         if !std::path::Path::new(&app_source).exists() {
@@ -107,7 +97,6 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
 
         // Remove existing app if present
         if std::path::Path::new(&app_dest).exists() {
-            println!("Removing existing app at {}", app_dest);
             let rm_status = Command::new("rm")
                 .args(["-rf", &app_dest])
                 .status()
@@ -129,12 +118,10 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
             return Err(eyre!("cp command failed: {}", stderr));
         }
 
-        println!("Successfully copied app to Applications");
         Ok(())
     })();
 
     // Always unmount, even if copy failed
-    println!("Unmounting DMG...");
     let unmount_result = Command::new("hdiutil")
         .args(["detach", &mount_point, "-force", "-quiet"])
         .output()
@@ -148,9 +135,6 @@ pub fn install_dmg(dmg_path: &str, app_name: &str) -> Result<()> {
 }
 
 fn extract_mount_point_from_plist(plist_data: &[u8]) -> Result<String> {
-    // Debug: print raw plist
-    println!("Plist data length: {} bytes", plist_data.len());
-
     // Parse the plist
     let value = Value::from_reader_xml(plist_data).wrap_err("Failed to parse plist")?;
 
