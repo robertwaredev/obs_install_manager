@@ -42,12 +42,8 @@ impl App {
             ui::FnItem::new(install::khs, "Install Kilohearts Essentials"),
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             ui::FnItem::new(install::rea, "Install ReaPlugs"),
-            // #[cfg(target_os = "windows")]
-            // ui::FnItem::new(install::vmb, "Install Voicemeeter Banana"),
             #[cfg(target_os = "macos")]
             ui::FnItem::new(install::eab, "Install BlackHole Driver"),
-            // #[cfg(any(target_os = "windows", target_os = "macos"))]
-            // ui::FnItem::new(install::sbs, "Install Sonobus"),
         ];
 
         let state = ListState::default().with_selected(Some(0));
