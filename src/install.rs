@@ -224,14 +224,16 @@ pub fn vmb(tx: Sender<Event>) -> Result<()> {
     let exe_dir = exe_path.parent().unwrap();
     let zip_path = exe_dir.join("voicemeeter_banana_installer.zip");
 
-    // Install & clean up
+    // Download zip
     if !zip_path.exists() {
         file::download(&crate::VMB_URL.to_string(), &zip_path, &tx)?;
-        file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
-        fs::remove_file(&zip_path)?;
     }
 
-    // Open directory
+    // Extract zip
+    file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
+    fs::remove_file(&zip_path)?;
+
+    // Run installer
     let file_path = exe_dir.join("voicemeeterprosetup.exe");
     file::run(&file_path)?;
     fs::remove_file(&file_path)?;
@@ -265,8 +267,10 @@ pub fn sbs(tx: Sender<Event>) -> Result<()> {
     let exe_dir = exe_path.parent().unwrap();
     let file_path = exe_dir.join(&git_asset.name);
 
-    // Download & install
-    file::download(&git_asset.browser_download_url, &file_path, &tx)?;
+    // Download & run
+    if !file_path.exists() {
+        file::download(&git_asset.browser_download_url, &file_path, &tx)?;
+    }
     file::run(&file_path)?;
     fs::remove_file(&file_path)?;
 
