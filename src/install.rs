@@ -60,22 +60,22 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         os::windows::fs::symlink_dir(&cfg_dir, &asset_dir.join("config"))?;
 
         // Download OBS template & extract zip
-        let zip_path = exe_dir.join("daw-obs-config-master.zip");
-        let zip_name = exe_dir.join("daw-obs-config-master");
-        let cfg_src = zip_name.join("obs-studio");
+        let cfg_path = exe_dir.join("daw-obs-config-master.zip");
+        let cfg_name = exe_dir.join("daw-obs-config-master");
+        let cfg_src = cfg_name.join("obs-studio");
         let cfg_dst = cfg_dir.join("obs-studio");
 
-        if !zip_path.exists() {
-            file::download(&crate::OBS_CONFIG_URL.to_string(), &zip_path, &tx)?;
+        if !cfg_path.exists() {
+            file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
         }
-        if zip_name.exists() {
-            fs::remove_dir_all(&zip_name)?;
+        if cfg_name.exists() {
+            fs::remove_dir_all(&cfg_name)?;
         }
 
-        file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
-        fs::remove_file(&zip_path)?;
+        file::extract_zip(&cfg_path, &exe_dir.to_path_buf())?;
+        fs::remove_file(&cfg_path)?;
         file::copy_dir(&cfg_src, &cfg_dst)?;
-        fs::remove_dir_all(&zip_name)?;
+        fs::remove_dir_all(&cfg_name)?;
 
         // OBS ASIO plugin
         {
