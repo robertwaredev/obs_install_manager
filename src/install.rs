@@ -87,14 +87,14 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
             let git_asset = git_assets.first().ok_or_eyre("Git asset not found!")?;
 
             // Download asset
-            let zip_path = exe_dir.join(&git_asset.name);
-            if !zip_path.exists() {
-                file::download(&git_asset.browser_download_url, &zip_path, &tx)?;
+            let asset_path = exe_dir.join(&git_asset.name);
+            if !asset_path.exists() {
+                file::download(&git_asset.browser_download_url, &asset_path, &tx)?;
             }
 
             // Extract zip
-            file::extract_zip(&zip_path, &asset_dir)?;
-            fs::remove_file(&zip_path)?;
+            file::extract_zip(&asset_path, &asset_dir)?;
+            fs::remove_file(&asset_path)?;
         }
 
         // OBS atkAudio plugin
@@ -105,18 +105,18 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
             let git_asset = git_assets.first().ok_or_eyre("Git asset not found!")?;
 
             // Download asset
-            let zip_path = exe_dir.join(&git_asset.name);
-            if !zip_path.exists() {
-                file::download(&git_asset.browser_download_url, &zip_path, &tx)?;
+            let asset_path = exe_dir.join(&git_asset.name);
+            if !asset_path.exists() {
+                file::download(&git_asset.browser_download_url, &asset_path, &tx)?;
             }
 
             // Extract zip into sub folder
-            let atk_dir = exe_dir.join("atk_audio");
-            file::extract_zip(&zip_path, &atk_dir)?;
-            fs::remove_file(&zip_path)?;
+            let asset_dir = exe_dir.join("atk_audio");
+            file::extract_zip(&asset_path, &asset_dir)?;
+            fs::remove_file(&asset_path)?;
 
             // Filter entries for platform and extract zip
-            for entry in fs::read_dir(&atk_dir)? {
+            for entry in fs::read_dir(&asset_dir)? {
                 let entry_path = entry?.path();
                 let entry_name = entry_path.to_str().unwrap().to_lowercase();
                 if entry_name.contains("windows") && entry_name.contains("zip") {
@@ -124,7 +124,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
                 }
             }
 
-            fs::remove_dir_all(&atk_dir)?;
+            fs::remove_dir_all(&asset_dir)?;
         }
 
         // Create OBS shortcut
@@ -153,23 +153,23 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         let home = std::path::PathBuf::from(&home);
 
         // Download OBS template zip
-        let zip_path = exe_dir.join("daw-obs-config-macos-master.zip");
-        let zip_name = exe_dir.join("daw-obs-config-macos-master");
-        let cfg_src = zip_name.join("obs-studio");
+        let cfg_path = exe_dir.join("daw-obs-config-macos-master.zip");
+        let cfg_name = exe_dir.join("daw-obs-config-macos-master");
+        let cfg_src = cfg_name.join("obs-studio");
         let cfg_dst = home.join("Library/Application Support/obs-studio");
 
-        if !zip_path.exists() {
-            file::download(&crate::OBS_CONFIG_URL.to_string(), &zip_path, &tx)?;
+        if !cfg_path.exists() {
+            file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
         }
         if !cfg_dst.exists() {
             fs::create_dir(&cfg_dst)?;
         }
 
         // Extract zip and move contents
-        file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
+        file::extract_zip(&cfg_path, &exe_dir.to_path_buf())?;
         fs::rename(&cfg_src, &cfg_dst)?;
-        fs::remove_file(&zip_path)?;
-        fs::remove_dir_all(&zip_name)?;
+        fs::remove_file(&cfg_path)?;
+        fs::remove_dir_all(&cfg_name)?;
     }
 
     Ok(())
