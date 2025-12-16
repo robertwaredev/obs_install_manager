@@ -4,7 +4,7 @@ use curl::easy::{Easy, WriteError};
 use std::{
     fs,
     io::{self, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, ExitStatus},
     sync::mpsc,
     thread,
@@ -39,6 +39,35 @@ pub fn download<P: AsRef<Path>>(
 
     transfer.perform()?;
     send_progress_event(0.0, progress_tx);
+    Ok(())
+}
+
+pub fn copy_dir(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
+    let src = src.as_ref();
+    let dst = dst.as_ref();
+
+    if !src.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "source is not a directory",
+        ));
+    }
+
+    fs::create_dir_all(dst)?;
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path: PathBuf = dst.join(entry.file_name());
+
+        if file_type.is_dir() {
+            copy_dir(&src_path, &dst_path)?;
+        } else if file_type.is_file() {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
     Ok(())
 }
 

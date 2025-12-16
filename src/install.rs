@@ -1,10 +1,7 @@
 #[cfg(windows)]
 use crate::scut;
 use crate::{app::Event, file, git::*};
-use color_eyre::{
-    Result,
-    eyre::{OptionExt, eyre},
-};
+use color_eyre::{Result, eyre::OptionExt};
 use std::{fs, os, sync::mpsc::Sender};
 
 // OBS (Open Broadcast Software)
@@ -33,53 +30,51 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     // Build paths
     let exe_path = std::env::current_exe()?;
     let exe_dir = exe_path.parent().unwrap();
-    let file_path = exe_dir.join(&git_asset.name);
-    let file_name = file_path.file_stem().unwrap();
+    let asset_path = exe_dir.join(&git_asset.name);
+    let asset_name = asset_path.file_stem().unwrap();
 
     // Download asset
-    if !file_path.exists() {
-        file::download(&git_asset.browser_download_url, &file_path, &tx)?;
+    if !asset_path.exists() {
+        file::download(&git_asset.browser_download_url, &asset_path, &tx)?;
     }
 
     // Windows setup
     #[cfg(target_os = "windows")]
     {
-        // Extract ZIP
-        let zip_dir = exe_dir.join(&file_name);
-        if zip_dir.exists() || file_path.exists() {
-            opener::open(exe_dir)?;
-            return Err(eyre!("OBS is already installed!"));
+        // Extract zip
+        let asset_dir = exe_dir.join(&asset_name);
+        if asset_dir.exists() {
+            fs::remove_dir_all(&asset_dir)?;
         }
-        file::extract_zip(&file_path, &zip_dir)?;
-        fs::remove_file(&file_path)?;
+        file::extract_zip(&asset_path, &asset_dir)?;
+        fs::remove_file(&asset_path)?;
 
         // Enable portable mode
-        fs::File::create(zip_dir.join("portable_mode"))?;
+        fs::File::create(asset_dir.join("portable_mode"))?;
 
         // Setup config folder
         let cfg_dir = exe_dir.join("obs-config");
         if !cfg_dir.exists() {
             fs::create_dir(&cfg_dir)?;
         }
-        os::windows::fs::symlink_dir(&cfg_dir, &zip_dir.join("config"))?;
+        os::windows::fs::symlink_dir(&cfg_dir, &asset_dir.join("config"))?;
 
-        // Download OBS template zip
+        // Download OBS template & extract zip
         let zip_path = exe_dir.join("daw-obs-config-master.zip");
         let zip_name = exe_dir.join("daw-obs-config-master");
-        let from = zip_name.join("obs-studio");
-        let to = cfg_dir.join("obs-studio");
+        let cfg_src = zip_name.join("obs-studio");
+        let cfg_dst = cfg_dir.join("obs-studio");
 
         if !zip_path.exists() {
             file::download(&crate::OBS_CONFIG_URL.to_string(), &zip_path, &tx)?;
         }
-        if !to.exists() {
-            fs::create_dir(&to)?;
+        if zip_name.exists() {
+            fs::remove_dir_all(&zip_name)?;
         }
 
-        // Extract zip and move contents
         file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
-        fs::rename(&from, &to)?;
         fs::remove_file(&zip_path)?;
+        file::copy_dir(&cfg_src, &cfg_dst)?;
         fs::remove_dir_all(&zip_name)?;
 
         // OBS ASIO plugin
@@ -96,7 +91,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
             }
 
             // Extract zip
-            file::extract_zip(&zip_path, &zip_dir)?;
+            file::extract_zip(&zip_path, &asset_dir)?;
             fs::remove_file(&zip_path)?;
         }
 
@@ -123,7 +118,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
                 let entry_path = entry?.path();
                 let entry_name = entry_path.to_str().unwrap().to_lowercase();
                 if entry_name.contains("windows") && entry_name.contains("zip") {
-                    file::extract_zip(&entry_path, &zip_dir)?;
+                    file::extract_zip(&entry_path, &asset_dir)?;
                 }
             }
 
@@ -136,7 +131,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
             if scut_path.exists() {
                 fs::remove_file(&scut_path)?;
             }
-            let target_path = zip_dir.join("bin/64bit/obs64.exe");
+            let target_path = asset_dir.join("bin/64bit/obs64.exe");
             scut::create_shortcut(scut_path, target_path)?;
         }
 
@@ -148,29 +143,29 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         // Install DMG
-        file::install_dmg(&file_path.to_str().unwrap(), "OBS")?;
-        fs::remove_file(&file_path)?;
+        file::install_dmg(&asset_path.to_str().unwrap(), "OBS")?;
+        fs::remove_file(&asset_path)?;
 
         // Get home path from env variable
-        let home = std::env::var("HOME").map_err(|_| eyre!("Could not find home directory!"))?;
+        let home = std::env::var("HOME")?;
         let home = std::path::PathBuf::from(&home);
 
         // Download OBS template zip
         let zip_path = exe_dir.join("daw-obs-config-macos-master.zip");
         let zip_name = exe_dir.join("daw-obs-config-macos-master");
-        let from = zip_name.join("obs-studio");
-        let to = home.join("Library/Application Support/obs-studio");
+        let cfg_src = zip_name.join("obs-studio");
+        let cfg_dst = home.join("Library/Application Support/obs-studio");
 
         if !zip_path.exists() {
             file::download(&crate::OBS_CONFIG_URL.to_string(), &zip_path, &tx)?;
         }
-        if !to.exists() {
-            fs::create_dir(&to)?;
+        if !cfg_dst.exists() {
+            fs::create_dir(&cfg_dst)?;
         }
 
         // Extract zip and move contents
         file::extract_zip(&zip_path, &exe_dir.to_path_buf())?;
-        fs::rename(&from, &to)?;
+        fs::rename(&cfg_src, &cfg_dst)?;
         fs::remove_file(&zip_path)?;
         fs::remove_dir_all(&zip_name)?;
     }
