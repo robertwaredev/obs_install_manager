@@ -26,7 +26,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     let arch = vec!["arm", "apple"];
 
     // Get latest asset infos
-    let git_release = github_api_client.get_release(&crate::OBS_GIT_REPO, None)?;
+    let git_release = github_api_client.get_release(&crate::OBS_REPO, None)?;
     let git_assets = git_release.get_assets(Some(inc), Some(exc), Some(arch));
     let git_asset = git_assets.first().ok_or_eyre("Git asset not found!")?;
 
@@ -85,7 +85,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         // OBS ASIO plugin
         {
             // Get latest asset infos
-            let git_release = github_api_client.get_release(&crate::OBS_ASIO_GIT_REPO, None)?;
+            let git_release = github_api_client.get_release(&crate::OBS_ASIO_REPO, None)?;
             let git_assets = git_release.get_assets(Some(vec!["zip"]), None, None);
             let git_asset = git_assets.first().ok_or_eyre("Git asset not found!")?;
 
@@ -254,7 +254,7 @@ pub fn sbs(tx: Sender<Event>) -> Result<()> {
     let inc = vec!["mac", "dmg"];
 
     // Get latest OBS asset infos
-    let git_release = GithubApiClient::new()?.get_release(&crate::SBS_GIT_REPO, None)?;
+    let git_release = GithubApiClient::new()?.get_release(&crate::SONOBUS_REPO, None)?;
     let git_assets = git_release.get_assets(Some(inc), None, None);
     let git_asset = git_assets.first().ok_or_eyre("Git asset not found!")?;
 

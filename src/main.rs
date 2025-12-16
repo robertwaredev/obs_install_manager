@@ -12,12 +12,12 @@ pub mod ui;
 #[cfg(windows)]
 pub mod scut;
 
-pub const OBS_GIT_REPO: GithubRepo = GithubRepo {
+pub const OBS_REPO: GithubRepo = GithubRepo {
     author: "obsproject",
     name: "obs-studio",
 };
 
-pub const OBS_ASIO_GIT_REPO: GithubRepo = GithubRepo {
+pub const OBS_ASIO_REPO: GithubRepo = GithubRepo {
     author: "andersama",
     name: "obs-asio",
 };
@@ -32,7 +32,7 @@ pub const BLACKHOLE_REPO: GithubRepo = GithubRepo {
     name: "BlackHole",
 };
 
-pub const SBS_GIT_REPO: GithubRepo = GithubRepo {
+pub const SONOBUS_REPO: GithubRepo = GithubRepo {
     author: "sonosaurus",
     name: "sonobus",
 };
