@@ -46,8 +46,8 @@ impl App {
             // ui::FnItem::new(install::vmb, "Install Voicemeeter Banana"),
             #[cfg(target_os = "macos")]
             ui::FnItem::new(install::eab, "Install BlackHole Driver"),
-            #[cfg(any(target_os = "windows", target_os = "macos"))]
-            ui::FnItem::new(install::sbs, "Install Sonobus"),
+            // #[cfg(any(target_os = "windows", target_os = "macos"))]
+            // ui::FnItem::new(install::sbs, "Install Sonobus"),
         ];
 
         let state = ListState::default().with_selected(Some(0));

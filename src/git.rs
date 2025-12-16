@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 pub const GIT_REPO_API: &str = "https://api.github.com/repos";
 
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct GithubRepo {
     pub author: &'static str,
     pub name: &'static str,
@@ -82,41 +83,37 @@ pub struct GithubAuthor {
     pub site_admin: bool,
 }
 
+#[derive(Default, Clone, Debug)]
 pub struct GithubApiClient(Client);
 
 impl GithubApiClient {
     pub fn new() -> Result<Self> {
-        let client = Self(
+        Ok(Self(
             reqwest::blocking::Client::builder()
                 .user_agent("github-api-client/1.0")
-                .build()
-                .map_err(|e| eyre!("Could not create GithubApiClient. {}", e))?,
-        );
-        Ok(client)
+                .build()?,
+        ))
     }
 
     pub fn get_releases(&self, repo: &GithubRepo) -> Result<Vec<GithubRelease>> {
         let url = repo.url();
-        let url = url
-            .to_str()
-            .ok_or_else(|| eyre!("GithubRepo is not valid unicode."))?;
+        let url = url.to_str().expect("GithubRepo is not valid unicode.");
         self.parse_json::<Vec<GithubRelease>>(url)
     }
 
-    pub fn get_release(&self, repo: &GithubRepo, id: &Option<String>) -> Result<GithubRelease> {
+    pub fn get_release(&self, repo: &GithubRepo, version: Option<String>) -> Result<GithubRelease> {
         let mut url = repo.url();
 
-        if let Some(id) = id {
-            url.push(id);
+        if let Some(version) = version.as_ref() {
+            url.push(version);
         } else {
             url.push("latest");
         }
 
-        let url = url
-            .to_str()
-            .ok_or_else(|| eyre!("GithubRepo or id is not valid unicode."))?;
+        let url = url.to_str().expect("GithubRepo is not valid unicode.");
         self.parse_json::<GithubRelease>(url)
     }
+
 
     #[rustfmt::skip]
     fn parse_json<T: DeserializeOwned>(&self, url: impl IntoUrl) -> Result<T> {
@@ -127,5 +124,25 @@ impl GithubApiClient {
             reqwest::StatusCode::FORBIDDEN => Err(eyre!("(403) Rate limited or access denied.")),
             status => Err(eyre!("HTTP {}: {}", status, response.text()?)),
         }
+    }
+}
+
+impl GithubRelease {
+    #[rustfmt::skip]
+    pub fn get_assets(
+        self,
+        incl: Option<Vec<&'static str>>,
+        excl: Option<Vec<&'static str>>,
+        arch: Option<Vec<&'static str>>,
+    ) -> Vec<GithubAsset> {
+        self.assets
+            .into_iter()
+            .filter(|asset| {
+                let n = asset.name.to_lowercase();
+                incl.as_ref().map_or(true, |i| i.iter().all(|s|  n.contains(s))) &&
+                excl.as_ref().map_or(true, |e| e.iter().all(|s| !n.contains(s))) &&
+                arch.as_ref().map_or(true, |a| a.iter().any(|s|  n.contains(s)))
+            })
+            .collect()
     }
 }
