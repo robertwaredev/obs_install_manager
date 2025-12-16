@@ -39,9 +39,9 @@ impl App {
 
         let items = vec![
             ui::FnItem::new(install::obs, "Install OBS (Open Broadcast Software)"),
-            ui::FnItem::new(install::khs, "Install Kilohearts Bundle"),
+            ui::FnItem::new(install::khs, "Install Kilohearts Essentials"),
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            ui::FnItem::new(install::rea, "Install ReaPlugs Bundle"),
+            ui::FnItem::new(install::rea, "Install ReaPlugs"),
             // #[cfg(target_os = "windows")]
             // ui::FnItem::new(install::vmb, "Install Voicemeeter Banana"),
             #[cfg(target_os = "macos")]
