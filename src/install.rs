@@ -101,7 +101,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         // OBS atkAudio plugin
         {
             // Get latest asset infos
-            let git_release = github_api_client.get_release(&crate::OBS_ATK_AUDIO_REPO, None)?;
+            let git_release = github_api_client.get_release(&crate::OBS_ATK_REPO, None)?;
             let git_assets = git_release.get_assets(Some(vec!["zip"]), None, None);
             let git_asset = git_assets.first().ok_or_eyre("Git asset not found!")?;
 

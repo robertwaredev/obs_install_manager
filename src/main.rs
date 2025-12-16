@@ -22,7 +22,7 @@ pub const OBS_ASIO_REPO: GithubRepo = GithubRepo {
     name: "obs-asio",
 };
 
-pub const OBS_ATK_AUDIO_REPO: GithubRepo = GithubRepo {
+pub const OBS_ATK_REPO: GithubRepo = GithubRepo {
     author: "atkAudio",
     name: "PluginForObsRelease",
 };
