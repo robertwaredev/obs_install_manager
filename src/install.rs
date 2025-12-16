@@ -161,6 +161,9 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         if cfg_path.exists() {
             fs::remove_file(&cfg_path)?;
         }
+        if cfg_name.exists() {
+            fs::remove_dir_all(&cfg_name)?;
+        }
 
         // Extract zip and move contents
         file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
