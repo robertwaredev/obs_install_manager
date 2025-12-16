@@ -10,11 +10,11 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
 
     // Search tags per operating system
     #[cfg(target_os = "windows")]
-    let (inc, exc) = (vec!["windows", "zip"], vec!["pdb"]);
+    let (incl, excl) = (vec!["windows", "zip"], vec!["pdb"]);
     #[cfg(target_os = "macos")]
-    let (inc, exc) = (vec!["macos", "dmg"], vec!["tar"]);
+    let (incl, excl) = (vec!["macos", "dmg"], vec!["tar"]);
     #[cfg(target_os = "linux")]
-    let (inc, exc) = (vec!["ubuntu", "deb"], vec!["ddeb"]);
+    let (incl, excl) = (vec!["ubuntu", "deb"], vec!["ddeb"]);
 
     // Search tags per cpu architecture
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -24,7 +24,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
 
     // Get latest asset infos
     let git_release = github_api_client.get_release(&crate::OBS_REPO, None)?;
-    let git_assets = git_release.get_assets(Some(inc), Some(exc), Some(arch));
+    let git_assets = git_release.get_assets(Some(incl), Some(excl), Some(arch));
     let git_asset = git_assets.first().ok_or_eyre("Git asset not found!")?;
 
     // Build paths
@@ -75,8 +75,8 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
 
         file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
         file::extract_zip(&cfg_path, &exe_dir.to_path_buf())?;
-        fs::remove_file(&cfg_path)?;
         file::copy_dir(&cfg_src, &cfg_dst)?;
+        fs::remove_file(&cfg_path)?;
         fs::remove_dir_all(&cfg_name)?;
 
         // OBS ASIO plugin
@@ -250,13 +250,13 @@ pub fn eab(_: Sender<Event>) -> Result<()> {
 pub fn sbs(tx: Sender<Event>) -> Result<()> {
     // Search tags per operating system
     #[cfg(target_os = "windows")]
-    let inc = vec!["win", "exe"];
+    let incl = vec!["win", "exe"];
     #[cfg(target_os = "macos")]
-    let inc = vec!["mac", "dmg"];
+    let incl = vec!["mac", "dmg"];
 
     // Get latest OBS asset infos
     let git_release = GithubApiClient::new()?.get_release(&crate::SONOBUS_REPO, None)?;
-    let git_assets = git_release.get_assets(Some(inc), None, None);
+    let git_assets = git_release.get_assets(Some(incl), None, None);
     let git_asset = git_assets.first().ok_or_eyre("Git asset not found!")?;
 
     // Build paths
