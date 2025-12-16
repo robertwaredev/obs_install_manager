@@ -94,6 +94,8 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
             if !zip_path.exists() {
                 file::download(&git_asset.browser_download_url, &zip_path, &tx)?;
             }
+
+            // Extract zip
             file::extract_zip(&zip_path, &zip_dir)?;
             fs::remove_file(&zip_path)?;
         }
@@ -116,7 +118,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
             file::extract_zip(&zip_path, &atk_dir)?;
             fs::remove_file(&zip_path)?;
 
-            // Filter assets for platform and extract
+            // Filter entries for platform and extract zip
             for entry in fs::read_dir(&atk_dir)? {
                 let entry_path = entry?.path();
                 let entry_name = entry_path.to_str().unwrap().to_lowercase();
