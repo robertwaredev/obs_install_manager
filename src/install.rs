@@ -165,7 +165,6 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
             fs::remove_dir_all(&cfg_name)?;
         }
 
-        // Extract zip and move contents
         file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
         file::extract_zip(&cfg_path, &exe_dir.to_path_buf())?;
         file::copy_dir(&cfg_src, &cfg_dst)?;
