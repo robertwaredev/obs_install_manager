@@ -50,7 +50,7 @@ impl App {
             // ui::FnItem::new(install::sbs, "Install Sonobus"),
         ];
 
-        let state = ListState::default().with_selected(Some(1));
+        let state = ListState::default().with_selected(Some(0));
         let header = Line::from(" OBS Install Manager ".bold());
         let footer = Line::from(
             [" Up <↑>", "Down <↓>", "Accept <Enter>", "Exit <Esc> "]
