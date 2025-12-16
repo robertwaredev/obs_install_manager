@@ -152,7 +152,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         let home = std::env::var("HOME")?;
         let home = std::path::PathBuf::from(&home);
 
-        // Download OBS template zip
+        // Download & extract OBS config
         let cfg_path = exe_dir.join("daw-obs-config-macos-master.zip");
         let cfg_name = exe_dir.join("daw-obs-config-macos-master");
         let cfg_src = cfg_name.join("obs-studio");
