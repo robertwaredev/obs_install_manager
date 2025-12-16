@@ -41,7 +41,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         file::download(&git_asset.browser_download_url, &file_path, &tx)?;
     }
 
-    // Windows main setup
+    // Windows setup
     #[cfg(target_os = "windows")]
     {
         // Extract ZIP
@@ -144,7 +144,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         opener::open(exe_dir)?;
     }
 
-    // MacOS main setup
+    // MacOS setup
     #[cfg(target_os = "macos")]
     {
         // Install DMG
