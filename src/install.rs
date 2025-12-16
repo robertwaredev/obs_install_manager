@@ -158,14 +158,12 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         let cfg_src = cfg_name.join("obs-studio");
         let cfg_dst = home.join("Library/Application Support/obs-studio");
 
-        if !cfg_path.exists() {
-            file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
-        }
-        if !cfg_dst.exists() {
-            fs::create_dir(&cfg_dst)?;
+        if cfg_path.exists() {
+            fs::remove_file(&cfg_path)?;
         }
 
         // Extract zip and move contents
+        file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
         file::extract_zip(&cfg_path, &exe_dir.to_path_buf())?;
         file::copy_dir(&cfg_src, &cfg_dst)?;
         fs::remove_file(&cfg_path)?;
