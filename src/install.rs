@@ -34,9 +34,10 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
     let asset_name = asset_path.file_stem().unwrap();
 
     // Download asset
-    if !asset_path.exists() {
-        file::download(&git_asset.browser_download_url, &asset_path, &tx)?;
+    if asset_path.exists() {
+        fs::remove_file(&asset_path)?;
     }
+    file::download(&git_asset.browser_download_url, &asset_path, &tx)?;
 
     // Windows setup
     #[cfg(target_os = "windows")]
@@ -59,19 +60,20 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
         }
         os::windows::fs::symlink_dir(&cfg_dir, &asset_dir.join("config"))?;
 
-        // Download OBS template & extract zip
+        // Download & extract OBS config
         let cfg_path = exe_dir.join("daw-obs-config-master.zip");
         let cfg_name = exe_dir.join("daw-obs-config-master");
         let cfg_src = cfg_name.join("obs-studio");
         let cfg_dst = cfg_dir.join("obs-studio");
 
-        if !cfg_path.exists() {
-            file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
+        if cfg_path.exists() {
+            fs::remove_file(&cfg_path)?;
         }
         if cfg_name.exists() {
             fs::remove_dir_all(&cfg_name)?;
         }
 
+        file::download(&crate::OBS_CONFIG_URL.to_string(), &cfg_path, &tx)?;
         file::extract_zip(&cfg_path, &exe_dir.to_path_buf())?;
         fs::remove_file(&cfg_path)?;
         file::copy_dir(&cfg_src, &cfg_dst)?;
