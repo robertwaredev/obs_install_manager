@@ -167,7 +167,7 @@ pub fn obs(tx: Sender<Event>) -> Result<()> {
 
         // Extract zip and move contents
         file::extract_zip(&cfg_path, &exe_dir.to_path_buf())?;
-        fs::rename(&cfg_src, &cfg_dst)?;
+        file::copy_dir(&cfg_src, &cfg_dst)?;
         fs::remove_file(&cfg_path)?;
         fs::remove_dir_all(&cfg_name)?;
     }
